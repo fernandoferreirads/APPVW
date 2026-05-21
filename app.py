@@ -377,7 +377,7 @@ def _img_b64(path: str) -> str:
         return ""
 
 _assets_dir   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
-_vw_b64       = _img_b64(os.path.join(_assets_dir, "vw_logo.png"))
+_vw_b64       = _img_b64(os.path.join(_assets_dir, "vw_logo_white.png"))
 _brasal_b64   = _img_b64(os.path.join(_assets_dir, "brasal_logo.png"))
 
 # ── Estilos VW Financial Services ────────────────────────────────────────────
@@ -387,9 +387,17 @@ st.markdown("""
 
 * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important; }
 
+/* Esconde branding Streamlit, mas mantém botão da sidebar visível */
 #MainMenu { visibility: hidden; }
-footer    { visibility: hidden; }
-header    { visibility: hidden; }
+footer { visibility: hidden; }
+[data-testid="stToolbar"] { display: none !important; }
+[data-testid="stDecoration"] { display: none !important; }
+[data-testid="stStatusWidget"] { visibility: hidden !important; }
+
+/* Fundo gradiente suave */
+.stApp {
+    background: linear-gradient(160deg, #ffffff 0%, #f4f6fb 55%, #eaecf4 100%) !important;
+}
 
 .block-container {
     padding-top: 1.5rem !important;
@@ -446,6 +454,31 @@ header    { visibility: hidden; }
     white-space: nowrap;
 }
 
+/* ── Título de seção com ícone SVG ── */
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 1.5rem 0 1rem 0;
+}
+.section-title span {
+    color: #001e50;
+    font-size: 1.2rem;
+    font-weight: 600;
+    letter-spacing: -0.2px;
+}
+
+/* ── Fix texto duplicado no botão de upload ── */
+[data-testid="stFileUploaderDropzoneButton"] p {
+    display: none !important;
+}
+[data-testid="stFileUploaderDropzoneButton"]::after {
+    content: "Selecionar arquivos";
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
 /* ── Sidebar ── */
 section[data-testid="stSidebar"] > div:first-child {
     background: #f4f6fb;
@@ -490,12 +523,12 @@ div[data-testid="stAlert"] {
     position: fixed;
     bottom: 0; left: 0; right: 0;
     height: 48px;
-    background: rgba(248,249,251,0.97);
+    background: rgba(244,246,251,0.97);
     backdrop-filter: blur(8px);
     border-top: 1px solid #dde3ef;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: flex-start;
     padding: 0 2rem;
     z-index: 9999;
     gap: 1rem;
@@ -544,9 +577,9 @@ _brasal_img = (
 )
 st.markdown(f"""
 <div class="vw-footer">
-    <span class="vw-footer-version">v1.3 · Banco Volkswagen CCB</span>
-    <div class="vw-footer-sep"></div>
     {_brasal_img}
+    <div class="vw-footer-sep"></div>
+    <span class="vw-footer-version">v1.3 · Banco Volkswagen CCB</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -597,7 +630,17 @@ with st.sidebar:
     st.caption("v1.3 — Banco Volkswagen CCB · Gemini")
 
 # ── Upload ───────────────────────────────────────────────────────────────────
-st.subheader("📂 Upload de Contratos")
+st.markdown("""
+<div class="section-title">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+         stroke="#001e50" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+    </svg>
+    <span>Envio de Contratos</span>
+</div>
+""", unsafe_allow_html=True)
 
 arquivos = st.file_uploader(
     "Arraste os PDFs dos contratos aqui",
