@@ -381,26 +381,34 @@ _vw_b64       = _img_b64(os.path.join(_assets_dir, "vw_logo.png"))
 _brasal_b64   = _img_b64(os.path.join(_assets_dir, "brasal_logo.png"))
 
 # ── Estilos VW Financial Services ────────────────────────────────────────────
+st.markdown('<meta name="google" content="notranslate">', unsafe_allow_html=True)
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important; }
 
-/* Esconde branding Streamlit, mas mantém botão da sidebar visível */
+/* Esconde branding Streamlit SEM remover o botão da sidebar */
 #MainMenu { visibility: hidden; }
 footer { visibility: hidden; }
-[data-testid="stToolbar"] { display: none !important; }
 [data-testid="stDecoration"] { display: none !important; }
 [data-testid="stStatusWidget"] { visibility: hidden !important; }
+/* Deixa a toolbar transparente mas NÃO usa display:none (sidebar toggle precisa dela) */
+[data-testid="stToolbar"] { visibility: hidden; }
+/* Header transparente — toggle da sidebar permanece clicável */
+header[data-testid="stHeader"] {
+    background: transparent !important;
+    border-bottom: none !important;
+}
 
 /* Fundo gradiente suave */
 .stApp {
     background: linear-gradient(160deg, #ffffff 0%, #f4f6fb 55%, #eaecf4 100%) !important;
 }
 
+/* Espaço para o header do Streamlit (onde fica o botão da sidebar) */
 .block-container {
-    padding-top: 1.5rem !important;
+    padding-top: 3.5rem !important;
     padding-bottom: 5rem !important;
 }
 
@@ -483,27 +491,36 @@ footer { visibility: hidden; }
 }
 
 /* ── Fix texto duplicado no botão de upload ── */
+/* Oculta TODO conteúdo interno do botão (qualquer variante de Streamlit) */
+[data-testid="stFileUploaderDropzone"] button > *,
+[data-testid="stFileUploaderDropzone"] button > * > *,
+[data-testid="stFileUploaderDropzoneButton"] > *,
+[data-testid="stFileUploaderDropzoneButton"] > * > * {
+    display: none !important;
+    visibility: hidden !important;
+}
+/* Substitui pelo nosso texto via ::before — CSS puro, não é traduzido */
+[data-testid="stFileUploaderDropzone"] button,
 [data-testid="stFileUploaderDropzoneButton"] {
     position: relative !important;
-    min-width: 140px !important;
+    min-width: 150px !important;
+    min-height: 36px !important;
 }
-[data-testid="stFileUploaderDropzoneButton"] * {
-    visibility: hidden !important;
-    font-size: 0 !important;
-    line-height: 0 !important;
-}
+[data-testid="stFileUploaderDropzone"] button::before,
 [data-testid="stFileUploaderDropzoneButton"]::before {
-    content: "Selecionar arquivos";
+    content: "Selecionar arquivos" !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    display: block !important;
     visibility: visible !important;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 0.85rem !important;
+    font-size: 0.875rem !important;
     font-weight: 500 !important;
-    line-height: normal !important;
-    white-space: nowrap;
-    color: inherit;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    color: inherit !important;
+    pointer-events: none !important;
 }
 
 /* ── Sidebar ── */
