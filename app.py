@@ -535,34 +535,6 @@ header[data-testid="stHeader"] {
     pointer-events: none !important;
 }
 
-/* ── Botão de configurações (⚙️) ── */
-.cfg-toggle-wrap {
-    margin-bottom: 0.5rem;
-}
-.cfg-toggle-wrap > div > button {
-    background: transparent !important;
-    border: 1.5px solid #c8d0e0 !important;
-    border-radius: 8px !important;
-    color: #001e50 !important;
-    font-size: 0.92rem !important;
-    font-weight: 600 !important;
-    padding: 0.35rem 1rem !important;
-    transition: background 0.18s, border-color 0.18s !important;
-}
-.cfg-toggle-wrap > div > button:hover {
-    background: #eef1f8 !important;
-    border-color: #001e50 !important;
-}
-
-/* ── Painel de configurações ── */
-.cfg-panel [data-testid="stHorizontalBlock"] {
-    background: #f8f9fb;
-    border: 1px solid #dde3ef;
-    border-radius: 0 0 8px 8px;
-    padding: 1rem 1.25rem 0.75rem;
-    margin-top: -0.5rem;
-}
-
 /* ── Seta animada entre header e conteúdo ── */
 .down-arrow-hint {
     display: flex;
@@ -674,16 +646,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Seta indicativa (header → conteúdo) ──────────────────────────────────────
-st.markdown("""
-<div class="down-arrow-hint">
-    <svg width="36" height="36" viewBox="0 0 24 24" fill="none"
-         stroke="#001e50" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="5 9 12 16 19 9"/>
-    </svg>
-</div>
-""", unsafe_allow_html=True)
-
 # ── Configurações (painel com botão ⚙️) ──────────────────────────────────────
 _gemini_default = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY", "")
 _sid_default    = os.getenv("SPREADSHEET_ID") or st.secrets.get("SPREADSHEET_ID", "")
@@ -691,13 +653,13 @@ _sid_default    = os.getenv("SPREADSHEET_ID") or st.secrets.get("SPREADSHEET_ID"
 if "cfg_open" not in st.session_state:
     st.session_state["cfg_open"] = False
 
-# Botão de engrenagem — emoji Unicode puro, nunca quebra com tradução
-st.markdown('<div class="cfg-toggle-wrap">', unsafe_allow_html=True)
-_lbl = "⚙️  Fechar configurações" if st.session_state["cfg_open"] else "⚙️  Configurações"
-if st.button(_lbl, key="btn_cfg"):
-    st.session_state["cfg_open"] = not st.session_state["cfg_open"]
-    st.rerun()
-st.markdown('</div>', unsafe_allow_html=True)
+# Botão em coluna estreita à esquerda — emoji Unicode, imune a tradutores
+_col_btn, _ = st.columns([2, 10])
+with _col_btn:
+    _lbl = "⚙️  Fechar" if st.session_state["cfg_open"] else "⚙️  Configurações"
+    if st.button(_lbl, key="btn_cfg", use_container_width=True):
+        st.session_state["cfg_open"] = not st.session_state["cfg_open"]
+        st.rerun()
 
 # Painel de campos (visível apenas quando aberto)
 if st.session_state["cfg_open"]:
