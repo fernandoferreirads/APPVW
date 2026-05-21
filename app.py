@@ -550,23 +550,16 @@ header[data-testid="stHeader"] {
 [data-testid="stExpander"] summary::-webkit-details-marker {
     display: none !important;
 }
-/* NUCLEAR FIX: esconde o ícone "arrow" em QUALQUER variante do Streamlit/Chrome */
-/* Caso 1 — ícone como filho direto do summary (antes do label) */
-[data-testid="stExpander"] summary > *:not(:last-child) { display: none !important; }
-/* Caso 2 — ícone dentro de um div wrapper */
-[data-testid="stExpander"] summary > div > *:not(:last-child),
-[data-testid="stExpander"] summary > div > span:first-child { display: none !important; }
-/* Caso 3 — span Material Icons (qualquer profundidade) */
-[data-testid="stExpander"] summary .material-icons,
-[data-testid="stExpander"] summary .material-icons-outlined,
-[data-testid="stExpander"] summary .material-symbols-rounded { display: none !important; }
-/* Caso 4 — tag <font> injetada pelo Chrome Translate */
-[data-testid="stExpander"] summary font { display: none !important; }
-/* Caso 5 — SVG de ícone */
-[data-testid="stExpander"] summary svg { display: none !important; }
-/* Garante label sempre visível */
-[data-testid="stExpander"] summary > *:last-child,
-[data-testid="stExpander"] summary p { display: block !important; }
+/* "arrow_right" fica no primeiro <p> — torna invisível zerando altura e cor */
+[data-testid="stExpander"] summary p:first-of-type {
+    color: transparent !important;
+    max-height: 0 !important;
+    line-height: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 0 !important;
+}
 
 /* ── Buttons ── */
 .stButton > button[kind="primary"] {
