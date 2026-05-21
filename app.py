@@ -550,15 +550,30 @@ header[data-testid="stHeader"] {
 [data-testid="stExpander"] summary::-webkit-details-marker {
     display: none !important;
 }
-/* "arrow_right" fica no primeiro <p> — torna invisível zerando altura e cor */
-[data-testid="stExpander"] summary p:first-of-type {
+/* "arrow_right" fica numa <span> — esconde span/svg, preserva <p> com o label */
+[data-testid="stExpander"] summary span,
+[data-testid="stExpander"] summary svg,
+[data-testid="stExpander"] summary font {
     color: transparent !important;
+    font-size: 0 !important;
     max-height: 0 !important;
     line-height: 0 !important;
     overflow: hidden !important;
+    display: inline-block !important;
+    width: 0 !important;
     padding: 0 !important;
     margin: 0 !important;
-    font-size: 0 !important;
+}
+/* Garante que o <p> com "Configurações" fique sempre visível */
+[data-testid="stExpander"] summary p {
+    color: #001e50 !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    max-height: none !important;
+    line-height: normal !important;
+    overflow: visible !important;
+    width: auto !important;
+    display: block !important;
 }
 
 /* ── Buttons ── */
