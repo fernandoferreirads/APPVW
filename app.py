@@ -542,45 +542,43 @@ header[data-testid="stHeader"] {
     background: #f8f9fb !important;
 }
 [data-testid="stExpander"] summary {
-    display: flex !important;
-    align-items: center !important;
     list-style: none !important;
     cursor: pointer !important;
-    padding: 0.65rem 1rem !important;
-    user-select: none !important;
 }
 [data-testid="stExpander"] summary::-webkit-details-marker {
     display: none !important;
 }
 /*
- * Nuclear: esconde TODO o conteúdo nativo do summary (inclui o texto
- * "arrow_right" que o Chrome Translate injeta como <font>/<span>).
- * Em seguida, injetamos o label via ::before e o chevron via ::after —
- * conteúdo CSS nunca é tocado pelo Chrome Translate.
+ * Estratégia definitiva:
+ * 1) font-size:0 + color:transparent em TODOS os descendentes do summary
+ *    → colapsa o texto "arrow_right" / "_arrow_right" sem remover o elemento do DOM
+ * 2) summary p tem especificidade 0-1-2, maior que summary * (0-1-1)
+ *    → com ambos usando !important, o de maior especificidade vence
+ *    → o <p> do label fica visível em #001e50 independente de onde esteja no DOM
  */
-[data-testid="stExpander"] summary > * {
-    display: none !important;
+[data-testid="stExpander"] summary * {
+    font-size: 0 !important;
+    color: transparent !important;
+    line-height: 0 !important;
 }
-[data-testid="stExpander"] summary::before {
-    content: "⚙️  Configurações" !important;
-    color: #001e50 !important;
-    font-family: 'Inter', -apple-system, sans-serif !important;
+[data-testid="stExpander"] summary p {
     font-size: 1rem !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.1px !important;
-    flex: 1 !important;
-    display: inline-block !important;
-}
-[data-testid="stExpander"] summary::after {
-    content: "▾" !important;
     color: #001e50 !important;
-    font-size: 1.3rem !important;
-    line-height: 1 !important;
-    display: inline-block !important;
-    transition: transform 0.22s ease !important;
+    font-weight: 600 !important;
+    line-height: 1.5 !important;
+    display: block !important;
 }
-details[data-testid="stExpander"][open] > summary::after {
-    transform: rotate(180deg) !important;
+/* Mantém o SVG do chevron visível */
+[data-testid="stExpander"] summary svg {
+    overflow: visible !important;
+    width: 18px !important;
+    height: 18px !important;
+}
+[data-testid="stExpander"] summary svg * {
+    stroke: #001e50 !important;
+    color: #001e50 !important;
+    font-size: initial !important;
+    line-height: initial !important;
 }
 
 /* ── Seta animada entre header e conteúdo ── */
@@ -588,12 +586,13 @@ details[data-testid="stExpander"][open] > summary::after {
     display: flex;
     justify-content: center;
     align-items: center;
-    margin: -0.25rem 0 1.25rem 0;
+    margin: 0.25rem 0 1.5rem 0;
+    opacity: 0.75;
     animation: vw-bounce 2.2s ease-in-out infinite;
 }
 @keyframes vw-bounce {
-    0%, 100% { transform: translateY(0px); opacity: 0.55; }
-    50%       { transform: translateY(7px); opacity: 0.9; }
+    0%, 100% { transform: translateY(0px);  opacity: 0.65; }
+    50%       { transform: translateY(8px);  opacity: 1;    }
 }
 
 /* ── Buttons ── */
