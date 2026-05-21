@@ -646,72 +646,52 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Configurações (painel com botão ⚙️) ──────────────────────────────────────
+# ── Configurações (popover — botão nativo, painel flutuante) ──────────────────
 _gemini_default = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY", "")
 _sid_default    = os.getenv("SPREADSHEET_ID") or st.secrets.get("SPREADSHEET_ID", "")
 
-if "cfg_open" not in st.session_state:
-    st.session_state["cfg_open"] = False
+# st.popover: botão sempre visível, abre popup ao clicar.
+# O bloco interno SEMPRE executa a cada rerun (como st.expander),
+# então todas as variáveis ficam disponíveis no escopo global.
+with st.popover("⚙️  Configurações"):
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        api_key = st.text_input(
+            "Gemini API Key",
+            value=_gemini_default,
+            type="password",
+            help="Chave gratuita em: aistudio.google.com → Get API Key",
+            key="cfg_api_key",
+        )
+    with col2:
+        _sid_raw = st.text_input(
+            "ID do Google Sheets",
+            value=_sid_default,
+            help="ID da planilha na URL: docs.google.com/spreadsheets/d/[ID]/edit",
+            key="cfg_sheets_id",
+        )
+    with col3:
+        creds_path_raw = st.text_input(
+            "Credenciais Google (JSON)",
+            value=os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials/service_account.json"),
+            help="Caminho para o arquivo JSON da conta de serviço",
+            key="cfg_creds_path",
+        )
 
-# Botão em coluna estreita à esquerda — emoji Unicode, imune a tradutores
-_col_btn, _ = st.columns([2, 10])
-with _col_btn:
-    _lbl = "⚙️  Fechar" if st.session_state["cfg_open"] else "⚙️  Configurações"
-    if st.button(_lbl, key="btn_cfg", use_container_width=True):
-        st.session_state["cfg_open"] = not st.session_state["cfg_open"]
-        st.rerun()
+    # Aceita URL completa ou só o ID — extrai apenas o ID
+    _sid_match = re.search(r'spreadsheets/d/([a-zA-Z0-9_-]+)', _sid_raw)
+    spreadsheet_id = _sid_match.group(1) if _sid_match else _sid_raw.strip()
 
-# Painel de campos (visível apenas quando aberto)
-if st.session_state["cfg_open"]:
-    with st.container(border=True):
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.text_input(
-                "Gemini API Key",
-                value=_gemini_default,
-                type="password",
-                help="Chave gratuita em: aistudio.google.com → Get API Key",
-                key="cfg_api_key",
-            )
-        with col2:
-            st.text_input(
-                "ID do Google Sheets",
-                value=_sid_default,
-                help="ID da planilha na URL: docs.google.com/spreadsheets/d/[ID]/edit",
-                key="cfg_sheets_id",
-            )
-        with col3:
-            st.text_input(
-                "Credenciais Google (JSON)",
-                value=os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials/service_account.json"),
-                help="Caminho para o arquivo JSON da conta de serviço",
-                key="cfg_creds_path",
-            )
+    # Resolve caminho relativo à pasta do app.py
+    _app_dir = os.path.dirname(os.path.abspath(__file__))
+    creds_path = (
+        creds_path_raw if os.path.isabs(creds_path_raw)
+        else os.path.join(_app_dir, creds_path_raw)
+    )
 
-# Variáveis sempre disponíveis — session_state persiste mesmo com painel fechado
-api_key        = st.session_state.get("cfg_api_key",    _gemini_default)
-_sid_raw       = st.session_state.get("cfg_sheets_id",  _sid_default)
-creds_path_raw = st.session_state.get(
-    "cfg_creds_path",
-    os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials/service_account.json"),
-)
-
-# Aceita URL completa ou só o ID — extrai apenas o ID
-_sid_match = re.search(r'spreadsheets/d/([a-zA-Z0-9_-]+)', _sid_raw)
-spreadsheet_id = _sid_match.group(1) if _sid_match else _sid_raw.strip()
-
-# Resolve caminho relativo à pasta do app.py
-_app_dir = os.path.dirname(os.path.abspath(__file__))
-creds_path = (
-    creds_path_raw if os.path.isabs(creds_path_raw)
-    else os.path.join(_app_dir, creds_path_raw)
-)
-
-# Sheets OK: arquivo local OU secrets da nuvem configurados
-_secrets_ok = "gcp_service_account" in st.secrets
-sheets_ok = bool(spreadsheet_id) and (os.path.exists(creds_path) or _secrets_ok)
-
-if st.session_state["cfg_open"]:
+    # Sheets OK: arquivo local OU secrets da nuvem configurados
+    _secrets_ok = "gcp_service_account" in st.secrets
+    sheets_ok = bool(spreadsheet_id) and (os.path.exists(creds_path) or _secrets_ok)
     if sheets_ok:
         st.success("Google Sheets configurado ✓")
     else:
