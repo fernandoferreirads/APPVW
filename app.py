@@ -545,6 +545,28 @@ header[data-testid="stHeader"] {
     font-weight: 600 !important;
     color: #001e50 !important;
 }
+/* Corrige Chrome Translate: envolve ícone Material em <font> quebrando ligatura */
+/* Zera font-size da <font> criada pelo Chrome Translate nos ícones do expander */
+[data-testid="stExpander"] summary font {
+    font-size: 0 !important;
+    line-height: 0 !important;
+    display: inline-block !important;
+    max-width: 20px !important;
+    overflow: hidden !important;
+    vertical-align: middle !important;
+}
+/* Também esconde o span de ícone diretamente */
+[data-testid="stExpander"] summary .material-icons,
+[data-testid="stExpander"] summary .material-icons-outlined {
+    font-size: 0 !important;
+    width: 18px !important;
+    height: 18px !important;
+    overflow: hidden !important;
+    display: inline-block !important;
+}
+[data-testid="stExpander"] summary svg {
+    flex-shrink: 0 !important;
+}
 
 /* ── Buttons ── */
 .stButton > button[kind="primary"] {
