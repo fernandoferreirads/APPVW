@@ -550,30 +550,25 @@ header[data-testid="stHeader"] {
 [data-testid="stExpander"] summary::-webkit-details-marker {
     display: none !important;
 }
-/* "arrow_right" fica numa <span> — esconde span/svg, preserva <p> com o label */
-[data-testid="stExpander"] summary span,
-[data-testid="stExpander"] summary svg,
-[data-testid="stExpander"] summary font {
-    color: transparent !important;
+/* Esconde APENAS a span filho direto do summary (contém o ícone arrow_right) */
+[data-testid="stExpander"] summary > span:first-child {
     font-size: 0 !important;
-    max-height: 0 !important;
-    line-height: 0 !important;
+    color: transparent !important;
+    max-height: 1px !important;
     overflow: hidden !important;
     display: inline-block !important;
-    width: 0 !important;
-    padding: 0 !important;
-    margin: 0 !important;
 }
-/* Garante que o <p> com "Configurações" fique sempre visível */
+/* Garante que o <p> "Configurações" fique visível em qualquer situação */
 [data-testid="stExpander"] summary p {
     color: #001e50 !important;
     font-size: 1rem !important;
     font-weight: 600 !important;
-    max-height: none !important;
-    line-height: normal !important;
+    max-height: unset !important;
     overflow: visible !important;
-    width: auto !important;
     display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: auto !important;
 }
 
 /* ── Buttons ── */
