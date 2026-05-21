@@ -550,25 +550,39 @@ header[data-testid="stHeader"] {
 [data-testid="stExpander"] summary::-webkit-details-marker {
     display: none !important;
 }
-/* Esconde APENAS a span filho direto do summary (contém o ícone arrow_right) */
-[data-testid="stExpander"] summary > span:first-child {
-    font-size: 0 !important;
-    color: transparent !important;
-    max-height: 1px !important;
-    overflow: hidden !important;
-    display: inline-block !important;
+/*
+ * Estratégia: visibility:hidden em TODOS os filhos diretos (esconde o
+ * texto "arrow_right" que o Chrome Translate injeta como <font>/<span>).
+ * Em seguida reexibimos especificamente o <p> do label e o SVG do chevron.
+ * visibility:hidden em pai pode ser sobrescrita com visibility:visible
+ * em filhos — diferente de display:none.
+ */
+[data-testid="stExpander"] summary > * {
+    visibility: hidden !important;
 }
-/* Garante que o <p> "Configurações" fique visível em qualquer situação */
-[data-testid="stExpander"] summary p {
+[data-testid="stExpander"] summary p,
+[data-testid="stExpander"] summary p * {
+    visibility: visible !important;
     color: #001e50 !important;
     font-size: 1rem !important;
     font-weight: 600 !important;
-    max-height: unset !important;
-    overflow: visible !important;
-    display: block !important;
+}
+[data-testid="stExpander"] summary svg,
+[data-testid="stExpander"] summary svg * {
     visibility: visible !important;
-    opacity: 1 !important;
-    width: auto !important;
+}
+
+/* ── Seta animada entre header e conteúdo ── */
+.down-arrow-hint {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: -0.5rem 0 1.5rem 0;
+    animation: vw-bounce 2.4s ease-in-out infinite;
+}
+@keyframes vw-bounce {
+    0%, 100% { transform: translateY(0px); opacity: 0.35; }
+    50%       { transform: translateY(6px); opacity: 0.65; }
 }
 
 /* ── Buttons ── */
@@ -665,6 +679,16 @@ st.markdown(f"""
     {_brasal_img}
     <div class="vw-footer-sep"></div>
     <span class="vw-footer-version">v1.3 · Banco Volkswagen CCB</span>
+</div>
+""", unsafe_allow_html=True)
+
+# ── Seta indicativa (header → conteúdo) ──────────────────────────────────────
+st.markdown("""
+<div class="down-arrow-hint">
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
+         stroke="#001e50" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"/>
+    </svg>
 </div>
 """, unsafe_allow_html=True)
 
