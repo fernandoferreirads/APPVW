@@ -366,7 +366,6 @@ st.set_page_config(
     page_title="Extrator VW — Financiamentos",
     page_icon="🚗",
     layout="wide",
-    initial_sidebar_state="expanded",
 )
 
 # ── Assets ───────────────────────────────────────────────────────────────────
@@ -524,24 +523,15 @@ header[data-testid="stHeader"] {
     pointer-events: none !important;
 }
 
-/* ── Sidebar ── */
-section[data-testid="stSidebar"] > div:first-child {
-    background: #f4f6fb;
-    border-right: 1px solid #dde3ef;
+/* ── Expander de Configurações ── */
+[data-testid="stExpander"] {
+    border: 1px solid #dde3ef !important;
+    border-radius: 8px !important;
+    background: #f8f9fb !important;
 }
-/* Botão de reabrir a sidebar (quando colapsada) — fundo azul VW para ser visível */
-[data-testid="stSidebarCollapsedControl"] {
-    background-color: #001e50 !important;
-    border-radius: 0 8px 8px 0 !important;
-    padding: 6px 4px !important;
-}
-[data-testid="stSidebarCollapsedControl"] button {
-    color: #ffffff !important;
-}
-[data-testid="stSidebarCollapsedControl"] svg {
-    fill: #ffffff !important;
-    stroke: #ffffff !important;
-    color: #ffffff !important;
+[data-testid="stExpander"] summary {
+    font-weight: 600 !important;
+    color: #001e50 !important;
 }
 
 /* ── Buttons ── */
@@ -641,34 +631,37 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Sidebar — Configurações ──────────────────────────────────────────────────
-with st.sidebar:
-    st.header("⚙️ Configurações")
+# ── Configurações (expander na página principal) ──────────────────────────────
+# Lê valores do .env local ou dos secrets do Streamlit Cloud
+_gemini_default = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY", "")
+_sid_default    = os.getenv("SPREADSHEET_ID") or st.secrets.get("SPREADSHEET_ID", "")
 
-    # Lê valores do .env local ou dos secrets do Streamlit Cloud
-    _gemini_default = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY", "")
-    _sid_default    = os.getenv("SPREADSHEET_ID") or st.secrets.get("SPREADSHEET_ID", "")
+with st.expander("⚙️ Configurações", expanded=False):
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        api_key = st.text_input(
+            "Gemini API Key",
+            value=_gemini_default,
+            type="password",
+            help="Chave gratuita em: aistudio.google.com → Get API Key",
+        )
+    with col2:
+        _sid_raw = st.text_input(
+            "ID do Google Sheets",
+            value=_sid_default,
+            help="ID da planilha na URL: docs.google.com/spreadsheets/d/[ID]/edit",
+        )
+    with col3:
+        creds_path_raw = st.text_input(
+            "Credenciais Google (JSON)",
+            value=os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials/service_account.json"),
+            help="Caminho para o arquivo JSON da conta de serviço",
+        )
 
-    api_key = st.text_input(
-        "Gemini API Key",
-        value=_gemini_default,
-        type="password",
-        help="Chave gratuita em: aistudio.google.com → Get API Key",
-    )
-    _sid_raw = st.text_input(
-        "ID do Google Sheets",
-        value=_sid_default,
-        help="ID da planilha na URL: docs.google.com/spreadsheets/d/[ID]/edit",
-    )
     # Aceita URL completa ou só o ID — extrai apenas o ID
     _sid_match = re.search(r'spreadsheets/d/([a-zA-Z0-9_-]+)', _sid_raw)
     spreadsheet_id = _sid_match.group(1) if _sid_match else _sid_raw.strip()
 
-    creds_path_raw = st.text_input(
-        "Credenciais Google (JSON)",
-        value=os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials/service_account.json"),
-        help="Caminho para o arquivo JSON da conta de serviço",
-    )
     # Resolve caminho relativo à pasta do app.py
     _app_dir = os.path.dirname(os.path.abspath(__file__))
     creds_path = (
@@ -682,10 +675,7 @@ with st.sidebar:
     if sheets_ok:
         st.success("Google Sheets configurado ✓")
     else:
-        st.warning("Configure o Google Sheets para poder inserir.")
-
-    st.divider()
-    st.caption("v1.3 — Banco Volkswagen CCB · Gemini")
+        st.warning("Configure o ID da planilha e as credenciais Google para habilitar a inserção.")
 
 # ── Upload ───────────────────────────────────────────────────────────────────
 st.markdown("""
