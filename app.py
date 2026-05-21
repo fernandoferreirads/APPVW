@@ -377,7 +377,7 @@ def _img_b64(path: str) -> str:
         return ""
 
 _assets_dir   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
-_vw_b64       = _img_b64(os.path.join(_assets_dir, "vw_logo_white.png"))
+_vw_b64       = _img_b64(os.path.join(_assets_dir, "vw_logo.png"))
 _brasal_b64   = _img_b64(os.path.join(_assets_dir, "brasal_logo.png"))
 
 # ── Estilos VW Financial Services ────────────────────────────────────────────
@@ -415,10 +415,24 @@ footer { visibility: hidden; }
     margin-bottom: 2rem;
     box-shadow: 0 4px 24px rgba(0,30,80,0.18);
 }
-.vw-header img.vw-logo {
-    width: 80px;
-    height: 80px;
+/* Logo VW dentro de círculo branco */
+.vw-logo-wrap {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
+    overflow: hidden;
+    padding: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+.vw-logo-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
 }
 .vw-header-sep {
     width: 1px;
@@ -469,14 +483,27 @@ footer { visibility: hidden; }
 }
 
 /* ── Fix texto duplicado no botão de upload ── */
-[data-testid="stFileUploaderDropzoneButton"] p {
-    display: none !important;
+[data-testid="stFileUploaderDropzoneButton"] {
+    position: relative !important;
+    min-width: 140px !important;
 }
-[data-testid="stFileUploaderDropzoneButton"]::after {
+[data-testid="stFileUploaderDropzoneButton"] * {
+    visibility: hidden !important;
+    font-size: 0 !important;
+    line-height: 0 !important;
+}
+[data-testid="stFileUploaderDropzoneButton"]::before {
     content: "Selecionar arquivos";
-    font-family: 'Inter', sans-serif;
-    font-size: 0.85rem;
-    font-weight: 500;
+    visibility: visible !important;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.85rem !important;
+    font-weight: 500 !important;
+    line-height: normal !important;
+    white-space: nowrap;
+    color: inherit;
 }
 
 /* ── Sidebar ── */
@@ -551,15 +578,14 @@ div[data-testid="stAlert"] {
 """, unsafe_allow_html=True)
 
 # ── Header ───────────────────────────────────────────────────────────────────
-_vw_img = (
-    f'<img src="data:image/png;base64,{_vw_b64}" class="vw-logo" alt="Volkswagen">'
+_vw_inner = (
+    f'<img src="data:image/png;base64,{_vw_b64}" alt="Volkswagen">'
     if _vw_b64 else
-    '<div style="width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.12);'
-    'display:flex;align-items:center;justify-content:center;color:white;font-size:1.6rem;font-weight:700;">VW</div>'
+    '<span style="color:#001e50;font-size:1.6rem;font-weight:700;">VW</span>'
 )
 st.markdown(f"""
 <div class="vw-header">
-    {_vw_img}
+    <div class="vw-logo-wrap">{_vw_inner}</div>
     <div class="vw-header-sep"></div>
     <div class="vw-header-text">
         <h1>Extrator de Contratos</h1>
