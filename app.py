@@ -542,34 +542,45 @@ header[data-testid="stHeader"] {
     background: #f8f9fb !important;
 }
 [data-testid="stExpander"] summary {
-    font-weight: 600 !important;
-    color: #001e50 !important;
-    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
     list-style: none !important;
+    cursor: pointer !important;
+    padding: 0.65rem 1rem !important;
+    user-select: none !important;
 }
 [data-testid="stExpander"] summary::-webkit-details-marker {
     display: none !important;
 }
 /*
- * Estratégia: visibility:hidden em TODOS os filhos diretos (esconde o
- * texto "arrow_right" que o Chrome Translate injeta como <font>/<span>).
- * Em seguida reexibimos especificamente o <p> do label e o SVG do chevron.
- * visibility:hidden em pai pode ser sobrescrita com visibility:visible
- * em filhos — diferente de display:none.
+ * Nuclear: esconde TODO o conteúdo nativo do summary (inclui o texto
+ * "arrow_right" que o Chrome Translate injeta como <font>/<span>).
+ * Em seguida, injetamos o label via ::before e o chevron via ::after —
+ * conteúdo CSS nunca é tocado pelo Chrome Translate.
  */
 [data-testid="stExpander"] summary > * {
-    visibility: hidden !important;
+    display: none !important;
 }
-[data-testid="stExpander"] summary p,
-[data-testid="stExpander"] summary p * {
-    visibility: visible !important;
+[data-testid="stExpander"] summary::before {
+    content: "⚙️  Configurações" !important;
     color: #001e50 !important;
+    font-family: 'Inter', -apple-system, sans-serif !important;
     font-size: 1rem !important;
     font-weight: 600 !important;
+    letter-spacing: 0.1px !important;
+    flex: 1 !important;
+    display: inline-block !important;
 }
-[data-testid="stExpander"] summary svg,
-[data-testid="stExpander"] summary svg * {
-    visibility: visible !important;
+[data-testid="stExpander"] summary::after {
+    content: "▾" !important;
+    color: #001e50 !important;
+    font-size: 1.3rem !important;
+    line-height: 1 !important;
+    display: inline-block !important;
+    transition: transform 0.22s ease !important;
+}
+details[data-testid="stExpander"][open] > summary::after {
+    transform: rotate(180deg) !important;
 }
 
 /* ── Seta animada entre header e conteúdo ── */
@@ -577,12 +588,12 @@ header[data-testid="stHeader"] {
     display: flex;
     justify-content: center;
     align-items: center;
-    margin: -0.5rem 0 1.5rem 0;
-    animation: vw-bounce 2.4s ease-in-out infinite;
+    margin: -0.25rem 0 1.25rem 0;
+    animation: vw-bounce 2.2s ease-in-out infinite;
 }
 @keyframes vw-bounce {
-    0%, 100% { transform: translateY(0px); opacity: 0.35; }
-    50%       { transform: translateY(6px); opacity: 0.65; }
+    0%, 100% { transform: translateY(0px); opacity: 0.55; }
+    50%       { transform: translateY(7px); opacity: 0.9; }
 }
 
 /* ── Buttons ── */
@@ -685,9 +696,9 @@ st.markdown(f"""
 # ── Seta indicativa (header → conteúdo) ──────────────────────────────────────
 st.markdown("""
 <div class="down-arrow-hint">
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
-         stroke="#001e50" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="6 9 12 15 18 9"/>
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none"
+         stroke="#001e50" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="5 9 12 16 19 9"/>
     </svg>
 </div>
 """, unsafe_allow_html=True)
