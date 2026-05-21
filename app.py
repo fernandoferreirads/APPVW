@@ -2,6 +2,7 @@ import streamlit as st
 import json
 import os
 import re
+import base64
 from datetime import datetime
 from difflib import get_close_matches
 
@@ -362,13 +363,192 @@ def inserir_linhas_sheets(linhas: list, spreadsheet_id: str, creds_path: str) ->
 # ─── Interface ─────────────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="Extrator VW — Plano de Pagamentos",
+    page_title="Extrator VW — Financiamentos",
     page_icon="🚗",
     layout="wide",
 )
 
-st.title("🚗 Extrator de Contratos VW")
-st.caption("Lê contratos de financiamento em PDF e insere automaticamente no Google Sheets")
+# ── Assets ───────────────────────────────────────────────────────────────────
+def _img_b64(path: str) -> str:
+    try:
+        with open(path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    except Exception:
+        return ""
+
+_assets_dir   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+_vw_b64       = _img_b64(os.path.join(_assets_dir, "vw_logo.png"))
+_brasal_b64   = _img_b64(os.path.join(_assets_dir, "brasal_logo.png"))
+
+# ── Estilos VW Financial Services ────────────────────────────────────────────
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+* { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important; }
+
+#MainMenu { visibility: hidden; }
+footer    { visibility: hidden; }
+header    { visibility: hidden; }
+
+.block-container {
+    padding-top: 1.5rem !important;
+    padding-bottom: 5rem !important;
+}
+
+/* ── Header ── */
+.vw-header {
+    background: linear-gradient(135deg, #001e50 0%, #002d7a 100%);
+    border-radius: 12px;
+    padding: 1.75rem 2.5rem;
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 24px rgba(0,30,80,0.18);
+}
+.vw-header img.vw-logo {
+    width: 80px;
+    height: 80px;
+    flex-shrink: 0;
+}
+.vw-header-sep {
+    width: 1px;
+    height: 56px;
+    background: rgba(255,255,255,0.2);
+    flex-shrink: 0;
+}
+.vw-header-text h1 {
+    color: #ffffff;
+    font-size: 1.55rem;
+    font-weight: 700;
+    margin: 0 0 5px 0;
+    letter-spacing: -0.4px;
+    line-height: 1.2;
+}
+.vw-header-text p {
+    color: rgba(255,255,255,0.6);
+    font-size: 0.875rem;
+    font-weight: 400;
+    margin: 0;
+    letter-spacing: 0.2px;
+}
+.vw-header-badge {
+    margin-left: auto;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 20px;
+    padding: 6px 18px;
+    color: rgba(255,255,255,0.75);
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+/* ── Sidebar ── */
+section[data-testid="stSidebar"] > div:first-child {
+    background: #f4f6fb;
+    border-right: 1px solid #dde3ef;
+}
+
+/* ── Buttons ── */
+.stButton > button[kind="primary"] {
+    background: #001e50 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+    font-size: 0.9rem !important;
+    letter-spacing: 0.2px !important;
+    transition: background 0.2s, box-shadow 0.2s, transform 0.15s !important;
+}
+.stButton > button[kind="primary"]:hover {
+    background: #002d7a !important;
+    box-shadow: 0 4px 14px rgba(0,30,80,0.28) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* ── Headings ── */
+h2, h3 {
+    color: #001e50 !important;
+    font-weight: 600 !important;
+}
+
+/* ── Progress bar ── */
+.stProgress > div > div > div {
+    background: linear-gradient(90deg, #001e50, #0057b8) !important;
+}
+
+/* ── Alerts ── */
+div[data-testid="stAlert"] {
+    border-radius: 8px !important;
+}
+
+/* ── Footer ── */
+.vw-footer {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 48px;
+    background: rgba(248,249,251,0.97);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid #dde3ef;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 2rem;
+    z-index: 9999;
+    gap: 1rem;
+}
+.vw-footer img {
+    height: 26px;
+    opacity: 0.85;
+}
+.vw-footer-sep {
+    width: 1px;
+    height: 20px;
+    background: #c0c8d8;
+}
+.vw-footer-version {
+    color: #8a94a8;
+    font-size: 0.72rem;
+    letter-spacing: 0.3px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ── Header ───────────────────────────────────────────────────────────────────
+_vw_img = (
+    f'<img src="data:image/png;base64,{_vw_b64}" class="vw-logo" alt="Volkswagen">'
+    if _vw_b64 else
+    '<div style="width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.12);'
+    'display:flex;align-items:center;justify-content:center;color:white;font-size:1.6rem;font-weight:700;">VW</div>'
+)
+st.markdown(f"""
+<div class="vw-header">
+    {_vw_img}
+    <div class="vw-header-sep"></div>
+    <div class="vw-header-text">
+        <h1>Extrator de Contratos</h1>
+        <p>Banco Volkswagen · CCB — Processamento automatizado via Gemini AI</p>
+    </div>
+    <span class="vw-header-badge">Financiamentos VW</span>
+</div>
+""", unsafe_allow_html=True)
+
+# ── Footer (posição fixa) ─────────────────────────────────────────────────────
+_brasal_img = (
+    f'<img src="data:image/png;base64,{_brasal_b64}" alt="Brasal Veículos">'
+    if _brasal_b64 else
+    '<span style="color:#6b7280;font-size:0.85rem;font-weight:500;">Brasal Veículos</span>'
+)
+st.markdown(f"""
+<div class="vw-footer">
+    <span class="vw-footer-version">v1.3 · Banco Volkswagen CCB</span>
+    <div class="vw-footer-sep"></div>
+    {_brasal_img}
+</div>
+""", unsafe_allow_html=True)
 
 # ── Sidebar — Configurações ──────────────────────────────────────────────────
 with st.sidebar:
