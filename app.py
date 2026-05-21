@@ -385,6 +385,18 @@ st.markdown('<meta name="google" content="notranslate">', unsafe_allow_html=True
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined');
+
+/* Garante que ícones Material não apareçam como texto se fonte falhar */
+.material-icons, .material-icons-outlined {
+    font-family: 'Material Icons', 'Material Icons Outlined' !important;
+    font-size: 18px !important;
+    line-height: 1 !important;
+    overflow: hidden !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    max-width: 20px !important;
+}
 
 * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important; }
 
