@@ -535,50 +535,32 @@ header[data-testid="stHeader"] {
     pointer-events: none !important;
 }
 
-/* ── Expander de Configurações ── */
-[data-testid="stExpander"] {
-    border: 1px solid #dde3ef !important;
+/* ── Botão de configurações (⚙️) ── */
+.cfg-toggle-wrap {
+    margin-bottom: 0.5rem;
+}
+.cfg-toggle-wrap > div > button {
+    background: transparent !important;
+    border: 1.5px solid #c8d0e0 !important;
     border-radius: 8px !important;
-    background: #f8f9fb !important;
-}
-[data-testid="stExpander"] summary {
-    list-style: none !important;
-    cursor: pointer !important;
-}
-[data-testid="stExpander"] summary::-webkit-details-marker {
-    display: none !important;
-}
-/*
- * Estratégia definitiva:
- * 1) font-size:0 + color:transparent em TODOS os descendentes do summary
- *    → colapsa o texto "arrow_right" / "_arrow_right" sem remover o elemento do DOM
- * 2) summary p tem especificidade 0-1-2, maior que summary * (0-1-1)
- *    → com ambos usando !important, o de maior especificidade vence
- *    → o <p> do label fica visível em #001e50 independente de onde esteja no DOM
- */
-[data-testid="stExpander"] summary * {
-    font-size: 0 !important;
-    color: transparent !important;
-    line-height: 0 !important;
-}
-[data-testid="stExpander"] summary p {
-    font-size: 1rem !important;
     color: #001e50 !important;
+    font-size: 0.92rem !important;
     font-weight: 600 !important;
-    line-height: 1.5 !important;
-    display: block !important;
+    padding: 0.35rem 1rem !important;
+    transition: background 0.18s, border-color 0.18s !important;
 }
-/* Mantém o SVG do chevron visível */
-[data-testid="stExpander"] summary svg {
-    overflow: visible !important;
-    width: 18px !important;
-    height: 18px !important;
+.cfg-toggle-wrap > div > button:hover {
+    background: #eef1f8 !important;
+    border-color: #001e50 !important;
 }
-[data-testid="stExpander"] summary svg * {
-    stroke: #001e50 !important;
-    color: #001e50 !important;
-    font-size: initial !important;
-    line-height: initial !important;
+
+/* ── Painel de configurações ── */
+.cfg-panel [data-testid="stHorizontalBlock"] {
+    background: #f8f9fb;
+    border: 1px solid #dde3ef;
+    border-radius: 0 0 8px 8px;
+    padding: 1rem 1.25rem 0.75rem;
+    margin-top: -0.5rem;
 }
 
 /* ── Seta animada entre header e conteúdo ── */
@@ -702,47 +684,72 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Configurações (expander na página principal) ──────────────────────────────
-# Lê valores do .env local ou dos secrets do Streamlit Cloud
+# ── Configurações (painel com botão ⚙️) ──────────────────────────────────────
 _gemini_default = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY", "")
 _sid_default    = os.getenv("SPREADSHEET_ID") or st.secrets.get("SPREADSHEET_ID", "")
 
-with st.expander("⚙️ Configurações", expanded=False):
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        api_key = st.text_input(
-            "Gemini API Key",
-            value=_gemini_default,
-            type="password",
-            help="Chave gratuita em: aistudio.google.com → Get API Key",
-        )
-    with col2:
-        _sid_raw = st.text_input(
-            "ID do Google Sheets",
-            value=_sid_default,
-            help="ID da planilha na URL: docs.google.com/spreadsheets/d/[ID]/edit",
-        )
-    with col3:
-        creds_path_raw = st.text_input(
-            "Credenciais Google (JSON)",
-            value=os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials/service_account.json"),
-            help="Caminho para o arquivo JSON da conta de serviço",
-        )
+if "cfg_open" not in st.session_state:
+    st.session_state["cfg_open"] = False
 
-    # Aceita URL completa ou só o ID — extrai apenas o ID
-    _sid_match = re.search(r'spreadsheets/d/([a-zA-Z0-9_-]+)', _sid_raw)
-    spreadsheet_id = _sid_match.group(1) if _sid_match else _sid_raw.strip()
+# Botão de engrenagem — emoji Unicode puro, nunca quebra com tradução
+st.markdown('<div class="cfg-toggle-wrap">', unsafe_allow_html=True)
+_lbl = "⚙️  Fechar configurações" if st.session_state["cfg_open"] else "⚙️  Configurações"
+if st.button(_lbl, key="btn_cfg"):
+    st.session_state["cfg_open"] = not st.session_state["cfg_open"]
+    st.rerun()
+st.markdown('</div>', unsafe_allow_html=True)
 
-    # Resolve caminho relativo à pasta do app.py
-    _app_dir = os.path.dirname(os.path.abspath(__file__))
-    creds_path = (
-        creds_path_raw if os.path.isabs(creds_path_raw)
-        else os.path.join(_app_dir, creds_path_raw)
-    )
+# Painel de campos (visível apenas quando aberto)
+if st.session_state["cfg_open"]:
+    with st.container(border=True):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.text_input(
+                "Gemini API Key",
+                value=_gemini_default,
+                type="password",
+                help="Chave gratuita em: aistudio.google.com → Get API Key",
+                key="cfg_api_key",
+            )
+        with col2:
+            st.text_input(
+                "ID do Google Sheets",
+                value=_sid_default,
+                help="ID da planilha na URL: docs.google.com/spreadsheets/d/[ID]/edit",
+                key="cfg_sheets_id",
+            )
+        with col3:
+            st.text_input(
+                "Credenciais Google (JSON)",
+                value=os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials/service_account.json"),
+                help="Caminho para o arquivo JSON da conta de serviço",
+                key="cfg_creds_path",
+            )
 
-    # Sheets OK: arquivo local OU secrets da nuvem configurados
-    _secrets_ok = "gcp_service_account" in st.secrets
-    sheets_ok = bool(spreadsheet_id) and (os.path.exists(creds_path) or _secrets_ok)
+# Variáveis sempre disponíveis — session_state persiste mesmo com painel fechado
+api_key        = st.session_state.get("cfg_api_key",    _gemini_default)
+_sid_raw       = st.session_state.get("cfg_sheets_id",  _sid_default)
+creds_path_raw = st.session_state.get(
+    "cfg_creds_path",
+    os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials/service_account.json"),
+)
+
+# Aceita URL completa ou só o ID — extrai apenas o ID
+_sid_match = re.search(r'spreadsheets/d/([a-zA-Z0-9_-]+)', _sid_raw)
+spreadsheet_id = _sid_match.group(1) if _sid_match else _sid_raw.strip()
+
+# Resolve caminho relativo à pasta do app.py
+_app_dir = os.path.dirname(os.path.abspath(__file__))
+creds_path = (
+    creds_path_raw if os.path.isabs(creds_path_raw)
+    else os.path.join(_app_dir, creds_path_raw)
+)
+
+# Sheets OK: arquivo local OU secrets da nuvem configurados
+_secrets_ok = "gcp_service_account" in st.secrets
+sheets_ok = bool(spreadsheet_id) and (os.path.exists(creds_path) or _secrets_ok)
+
+if st.session_state["cfg_open"]:
     if sheets_ok:
         st.success("Google Sheets configurado ✓")
     else:
