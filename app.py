@@ -544,29 +544,29 @@ header[data-testid="stHeader"] {
 [data-testid="stExpander"] summary {
     font-weight: 600 !important;
     color: #001e50 !important;
+    cursor: pointer !important;
+    list-style: none !important;
 }
-/* Corrige Chrome Translate: envolve ícone Material em <font> quebrando ligatura */
-/* Zera font-size da <font> criada pelo Chrome Translate nos ícones do expander */
-[data-testid="stExpander"] summary font {
-    font-size: 0 !important;
-    line-height: 0 !important;
-    display: inline-block !important;
-    max-width: 20px !important;
-    overflow: hidden !important;
-    vertical-align: middle !important;
+[data-testid="stExpander"] summary::-webkit-details-marker {
+    display: none !important;
 }
-/* Também esconde o span de ícone diretamente */
+/* NUCLEAR FIX: esconde o ícone "arrow" em QUALQUER variante do Streamlit/Chrome */
+/* Caso 1 — ícone como filho direto do summary (antes do label) */
+[data-testid="stExpander"] summary > *:not(:last-child) { display: none !important; }
+/* Caso 2 — ícone dentro de um div wrapper */
+[data-testid="stExpander"] summary > div > *:not(:last-child),
+[data-testid="stExpander"] summary > div > span:first-child { display: none !important; }
+/* Caso 3 — span Material Icons (qualquer profundidade) */
 [data-testid="stExpander"] summary .material-icons,
-[data-testid="stExpander"] summary .material-icons-outlined {
-    font-size: 0 !important;
-    width: 18px !important;
-    height: 18px !important;
-    overflow: hidden !important;
-    display: inline-block !important;
-}
-[data-testid="stExpander"] summary svg {
-    flex-shrink: 0 !important;
-}
+[data-testid="stExpander"] summary .material-icons-outlined,
+[data-testid="stExpander"] summary .material-symbols-rounded { display: none !important; }
+/* Caso 4 — tag <font> injetada pelo Chrome Translate */
+[data-testid="stExpander"] summary font { display: none !important; }
+/* Caso 5 — SVG de ícone */
+[data-testid="stExpander"] summary svg { display: none !important; }
+/* Garante label sempre visível */
+[data-testid="stExpander"] summary > *:last-child,
+[data-testid="stExpander"] summary p { display: block !important; }
 
 /* ── Buttons ── */
 .stButton > button[kind="primary"] {
