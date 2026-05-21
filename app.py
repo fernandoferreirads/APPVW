@@ -374,15 +374,19 @@ st.caption("Lê contratos de financiamento em PDF e insere automaticamente no Go
 with st.sidebar:
     st.header("⚙️ Configurações")
 
+    # Lê valores do .env local ou dos secrets do Streamlit Cloud
+    _gemini_default = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY", "")
+    _sid_default    = os.getenv("SPREADSHEET_ID") or st.secrets.get("SPREADSHEET_ID", "")
+
     api_key = st.text_input(
         "Gemini API Key",
-        value=os.getenv("GEMINI_API_KEY", ""),
+        value=_gemini_default,
         type="password",
         help="Chave gratuita em: aistudio.google.com → Get API Key",
     )
     _sid_raw = st.text_input(
         "ID do Google Sheets",
-        value=os.getenv("SPREADSHEET_ID", ""),
+        value=_sid_default,
         help="ID da planilha na URL: docs.google.com/spreadsheets/d/[ID]/edit",
     )
     # Aceita URL completa ou só o ID — extrai apenas o ID
@@ -401,22 +405,16 @@ with st.sidebar:
         else os.path.join(_app_dir, creds_path_raw)
     )
 
-    st.divider()
-
-    aba_atual = nome_aba_atual()
-    st.info(f"Aba de destino: **{aba_atual}**")
-
-    sheets_ok = bool(spreadsheet_id) and os.path.exists(creds_path)
+    # Sheets OK: arquivo local OU secrets da nuvem configurados
+    _secrets_ok = "gcp_service_account" in st.secrets
+    sheets_ok = bool(spreadsheet_id) and (os.path.exists(creds_path) or _secrets_ok)
     if sheets_ok:
         st.success("Google Sheets configurado ✓")
     else:
         st.warning("Configure o Google Sheets para poder inserir.")
-        st.caption(f"🔍 ID: `{spreadsheet_id or '(vazio)'}`")
-        st.caption(f"🔍 Creds path: `{creds_path}`")
-        st.caption(f"🔍 Arquivo existe: `{os.path.exists(creds_path)}`")
 
     st.divider()
-    st.caption("v1.2 — Banco Volkswagen CCB · Gemini (gratuito)")
+    st.caption("v1.3 — Banco Volkswagen CCB · Gemini")
 
 # ── Upload ───────────────────────────────────────────────────────────────────
 st.subheader("📂 Upload de Contratos")
