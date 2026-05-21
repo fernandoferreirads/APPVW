@@ -366,6 +366,7 @@ st.set_page_config(
     page_title="Extrator VW — Financiamentos",
     page_icon="🚗",
     layout="wide",
+    initial_sidebar_state="expanded",
 )
 
 # ── Assets ───────────────────────────────────────────────────────────────────
@@ -527,6 +528,20 @@ header[data-testid="stHeader"] {
 section[data-testid="stSidebar"] > div:first-child {
     background: #f4f6fb;
     border-right: 1px solid #dde3ef;
+}
+/* Botão de reabrir a sidebar (quando colapsada) — fundo azul VW para ser visível */
+[data-testid="stSidebarCollapsedControl"] {
+    background-color: #001e50 !important;
+    border-radius: 0 8px 8px 0 !important;
+    padding: 6px 4px !important;
+}
+[data-testid="stSidebarCollapsedControl"] button {
+    color: #ffffff !important;
+}
+[data-testid="stSidebarCollapsedControl"] svg {
+    fill: #ffffff !important;
+    stroke: #ffffff !important;
+    color: #ffffff !important;
 }
 
 /* ── Buttons ── */
