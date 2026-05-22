@@ -9,8 +9,8 @@ from difflib import get_close_matches
 import pandas as pd
 from google import genai
 from google.genai import types
-import msal
-import requests as _requests
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -315,64 +315,48 @@ def extrair_contrato(pdf_bytes: bytes, api_key: str) -> dict:
     return json.loads(texto)
 
 
-# ─── Excel Online (Microsoft Graph API) ───────────────────────────────────────
+# ─── Google Sheets ─────────────────────────────────────────────────────────────
+
+def get_sheets_service(creds_path: str):
+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    # Streamlit Cloud: lê credenciais dos secrets
+    try:
+        if "gcp_service_account" in st.secrets:
+            creds = service_account.Credentials.from_service_account_info(
+                dict(st.secrets["gcp_service_account"]),
+                scopes=scopes,
+            )
+            return build("sheets", "v4", credentials=creds)
+    except Exception:
+        pass
+    # Local: lê do arquivo JSON
+    creds = service_account.Credentials.from_service_account_file(
+        creds_path, scopes=scopes,
+    )
+    return build("sheets", "v4", credentials=creds)
+
 
 def nome_aba_atual() -> str:
     now = datetime.now()
     return f"{MESES_PT[now.month]} {now.year}"
 
 
-def _graph_token(tenant_id: str, client_id: str, client_secret: str) -> str:
-    """Obtém access token via client credentials (conta de serviço Azure)."""
-    _app = msal.ConfidentialClientApplication(
-        client_id,
-        authority=f"https://login.microsoftonline.com/{tenant_id}",
-        client_credential=client_secret,
-    )
-    result = _app.acquire_token_for_client(
-        scopes=["https://graph.microsoft.com/.default"]
-    )
-    if "access_token" not in result:
-        raise RuntimeError(
-            f"Falha na autenticação Azure: {result.get('error_description', result)}"
-        )
-    return result["access_token"]
-
-
-def _encode_sharing_url(url: str) -> str:
-    """Codifica link de compartilhamento OneDrive/SharePoint para Graph API."""
-    b64 = base64.urlsafe_b64encode(url.encode("utf-8")).rstrip(b"=").decode()
-    return f"u!{b64}"
-
-
-def inserir_linhas_excel(
-    linhas: list,
-    excel_url: str,
-    tenant_id: str,
-    client_id: str,
-    client_secret: str,
-) -> int:
-    """Insere linhas no Excel Online via Microsoft Graph API."""
-    token = _graph_token(tenant_id, client_id, client_secret)
-    hdrs = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-
-    encoded = _encode_sharing_url(excel_url)
-    base_wb = f"https://graph.microsoft.com/v1.0/shares/{encoded}/driveItem/workbook"
+def inserir_linhas_sheets(linhas: list, spreadsheet_id: str, creds_path: str) -> int:
+    service = get_sheets_service(creds_path)
     aba = nome_aba_atual()
 
-    # Descobre a próxima linha disponível na aba
-    resp = _requests.get(f"{base_wb}/worksheets('{aba}')/usedRange", headers=hdrs)
-    proxima_linha = (resp.json().get("rowCount", 0) + 1) if resp.ok else 1
+    resultado = service.spreadsheets().values().get(
+        spreadsheetId=spreadsheet_id,
+        range=f"'{aba}'!A:A",
+    ).execute()
+    proxima_linha = len(resultado.get("values", [])) + 1
 
-    # Escreve o bloco de linhas (28 colunas: A até AB)
-    n = len(linhas)
-    range_addr = f"A{proxima_linha}:AB{proxima_linha + n - 1}"
-    resp = _requests.patch(
-        f"{base_wb}/worksheets('{aba}')/range(address='{range_addr}')",
-        headers=hdrs,
-        json={"values": linhas},
-    )
-    resp.raise_for_status()
+    service.spreadsheets().values().update(
+        spreadsheetId=spreadsheet_id,
+        range=f"'{aba}'!A{proxima_linha}",
+        valueInputOption="USER_ENTERED",
+        body={"values": linhas},
+    ).execute()
     return proxima_linha
 
 
@@ -670,62 +654,48 @@ _sid_default    = os.getenv("SPREADSHEET_ID") or st.secrets.get("SPREADSHEET_ID"
 # O bloco interno SEMPRE executa a cada rerun (como st.expander),
 # então todas as variáveis ficam disponíveis no escopo global.
 with st.popover("⚙️  Configurações"):
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        api_key = st.text_input(
+            "Gemini API Key",
+            value=_gemini_default,
+            type="password",
+            help="Chave gratuita em: aistudio.google.com → Get API Key",
+            key="cfg_api_key",
+        )
+    with col2:
+        _sid_raw = st.text_input(
+            "ID do Google Sheets",
+            value=_sid_default,
+            help="ID da planilha na URL: docs.google.com/spreadsheets/d/[ID]/edit",
+            key="cfg_sheets_id",
+        )
+    with col3:
+        creds_path_raw = st.text_input(
+            "Credenciais Google (JSON)",
+            value=os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials/service_account.json"),
+            help="Caminho para o arquivo JSON da conta de serviço",
+            key="cfg_creds_path",
+        )
 
-    # ── Gemini AI ──────────────────────────────────────────────────────────
-    st.markdown("**🤖 Gemini AI**")
-    api_key = st.text_input(
-        "Gemini API Key",
-        value=_gemini_default,
-        type="password",
-        help="Chave gratuita em: aistudio.google.com → Get API Key",
-        key="cfg_api_key",
+    # Aceita URL completa ou só o ID — extrai apenas o ID
+    _sid_match = re.search(r'spreadsheets/d/([a-zA-Z0-9_-]+)', _sid_raw)
+    spreadsheet_id = _sid_match.group(1) if _sid_match else _sid_raw.strip()
+
+    # Resolve caminho relativo à pasta do app.py
+    _app_dir = os.path.dirname(os.path.abspath(__file__))
+    creds_path = (
+        creds_path_raw if os.path.isabs(creds_path_raw)
+        else os.path.join(_app_dir, creds_path_raw)
     )
 
-    st.divider()
-
-    # ── Excel Online (Microsoft Graph API) ────────────────────────────────
-    st.markdown("**📊 Excel Online — Microsoft 365**")
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        _tenant = st.text_input(
-            "Tenant ID (Azure)",
-            value=os.getenv("AZURE_TENANT_ID", ""),
-            type="password",
-            help="Portal Azure → Azure Active Directory → Visão geral → ID do locatário",
-            key="cfg_tenant",
-        )
-    with c2:
-        _client_id = st.text_input(
-            "Client ID (Azure)",
-            value=os.getenv("AZURE_CLIENT_ID", ""),
-            help="Portal Azure → Registros de aplicativo → seu app → ID do aplicativo",
-            key="cfg_client_id",
-        )
-    with c3:
-        _client_secret = st.text_input(
-            "Client Secret (Azure)",
-            value=os.getenv("AZURE_CLIENT_SECRET", ""),
-            type="password",
-            help="Portal Azure → Registros de aplicativo → Certificados e segredos",
-            key="cfg_client_secret",
-        )
-
-    _excel_url_default = os.getenv("EXCEL_SHARING_URL", "")
-    excel_url = st.text_input(
-        "Link de compartilhamento do arquivo Excel",
-        value=_excel_url_default,
-        help=(
-            "No OneDrive/SharePoint: clique no arquivo → Compartilhar → "
-            "Copiar link → cole aqui o link HTTPS completo."
-        ),
-        key="cfg_excel_url",
-    )
-
-    excel_ok = bool(_tenant and _client_id and _client_secret and excel_url)
-    if excel_ok:
-        st.success("Excel Online configurado ✓")
+    # Sheets OK: arquivo local OU secrets da nuvem configurados
+    _secrets_ok = "gcp_service_account" in st.secrets
+    sheets_ok = bool(spreadsheet_id) and (os.path.exists(creds_path) or _secrets_ok)
+    if sheets_ok:
+        st.success("Google Sheets configurado ✓")
     else:
-        st.warning("Preencha os campos Azure + link do arquivo para habilitar a inserção.")
+        st.warning("Configure o ID da planilha e as credenciais Google para habilitar a inserção.")
 
 # ── Upload ───────────────────────────────────────────────────────────────────
 st.markdown("""
@@ -831,23 +801,15 @@ if st.session_state.get("resultados"):
 
     with col_ins:
         aba_atual = nome_aba_atual()
-        label_btn = f"✅ Inserir {len(resultados)} linha(s) no Excel → aba {aba_atual}"
+        label_btn = f"✅ Inserir {len(resultados)} linha(s) na planilha → aba {aba_atual}"
 
-        _tenant      = st.session_state.get("cfg_tenant", "")
-        _client_id   = st.session_state.get("cfg_client_id", "")
-        _client_sec  = st.session_state.get("cfg_client_secret", "")
-        _excel_url   = st.session_state.get("cfg_excel_url", "")
-        excel_ok     = bool(_tenant and _client_id and _client_sec and _excel_url)
-
-        if not excel_ok:
-            st.warning("Configure o Excel Online nas ⚙️ Configurações para habilitar a inserção.")
+        if not sheets_ok:
+            st.warning("Configure o Google Sheets na barra lateral para habilitar a inserção.")
         else:
             if st.button(label_btn, type="primary", use_container_width=True):
                 try:
                     linhas = [para_linha_sheets(r) for r in resultados]
-                    linha_ini = inserir_linhas_excel(
-                        linhas, _excel_url, _tenant, _client_id, _client_sec
-                    )
+                    linha_ini = inserir_linhas_sheets(linhas, spreadsheet_id, creds_path)
                     st.success(
                         f"✅ **{len(linhas)} linha(s)** inserida(s) com sucesso na aba "
                         f"**{aba_atual}** a partir da linha **{linha_ini}**!"
@@ -855,4 +817,4 @@ if st.session_state.get("resultados"):
                     del st.session_state["resultados"]
                     st.balloons()
                 except Exception as e:
-                    st.error(f"❌ Erro ao inserir no Excel: {e}")
+                    st.error(f"❌ Erro ao inserir na planilha: {e}")
