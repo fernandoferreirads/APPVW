@@ -385,20 +385,27 @@ st.markdown('<meta name="google" content="notranslate">', unsafe_allow_html=True
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined');
-
-/* Garante que ícones Material não apareçam como texto se fonte falhar */
-.material-icons, .material-icons-outlined {
-    font-family: 'Material Icons', 'Material Icons Outlined' !important;
-    font-size: 18px !important;
-    line-height: 1 !important;
-    overflow: hidden !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    max-width: 20px !important;
-}
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block');
 
 * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important; }
+
+/*
+ * Restaura a fonte correta para os ícones do Streamlit.
+ * [data-testid="stIconMaterial"] tem especificidade 0-1-0 > universal 0-0-0,
+ * então sobrepõe o !important do * acima mesmo com !important aqui.
+ */
+[data-testid="stIconMaterial"] {
+    font-family: "Material Symbols Rounded" !important;
+    font-size: 1.25rem !important;
+    line-height: 1 !important;
+    font-weight: 400 !important;
+    font-style: normal !important;
+    letter-spacing: normal !important;
+    user-select: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
 
 /* Esconde branding Streamlit SEM remover o botão da sidebar */
 #MainMenu { visibility: hidden; }
