@@ -373,6 +373,23 @@ def extrair_contrato(pdf_bytes: bytes, api_key: str) -> dict:
 
 # ─── Google Sheets ─────────────────────────────────────────────────────────────
 
+# Cores de fundo por categoria de produto avulso
+CORES_CATEGORIA = {
+    "Seguro":     "#00B050",  # verde
+    "Garantia":   "#FFFF00",  # amarelo
+    "VW Protege": "#CC00FF",  # roxo
+}
+
+def _hex_to_rgb(hex_color: str) -> dict:
+    """Converte cor hex (#RRGGBB) em dict {red, green, blue} com valores 0-1."""
+    h = hex_color.lstrip("#")
+    return {
+        "red":   int(h[0:2], 16) / 255,
+        "green": int(h[2:4], 16) / 255,
+        "blue":  int(h[4:6], 16) / 255,
+    }
+
+
 def get_sheets_service(creds_path: str):
     scopes = ["https://www.googleapis.com/auth/spreadsheets"]
     # Streamlit Cloud: lê credenciais dos secrets
@@ -414,6 +431,67 @@ def inserir_linhas_sheets(linhas: list, spreadsheet_id: str, creds_path: str) ->
         body={"values": linhas},
     ).execute()
     return proxima_linha
+
+
+def inserir_e_colorir_avulso(itens: list, spreadsheet_id: str, creds_path: str) -> int:
+    """Insere linhas avulsas no Sheets e pinta cada linha com a cor da categoria."""
+    service  = get_sheets_service(creds_path)
+    aba      = nome_aba_atual()
+
+    # Próxima linha disponível
+    res       = service.spreadsheets().values().get(
+        spreadsheetId=spreadsheet_id, range=f"'{aba}'!A:A"
+    ).execute()
+    linha_ini = len(res.get("values", [])) + 1
+
+    # Insere os dados
+    linhas = [produto_para_linha_avulso(it) for it in itens]
+    service.spreadsheets().values().update(
+        spreadsheetId=spreadsheet_id,
+        range=f"'{aba}'!A{linha_ini}",
+        valueInputOption="USER_ENTERED",
+        body={"values": linhas},
+    ).execute()
+
+    # Obtém sheetId numérico da aba pelo nome
+    meta     = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+    sheet_id = next(
+        (s["properties"]["sheetId"] for s in meta["sheets"]
+         if s["properties"]["title"] == aba),
+        None,
+    )
+
+    # Aplica cor de fundo a cada linha conforme categoria
+    if sheet_id is not None:
+        reqs = []
+        for i, item in enumerate(itens):
+            cor = CORES_CATEGORIA.get(item["categoria"])
+            if not cor:
+                continue
+            reqs.append({
+                "repeatCell": {
+                    "range": {
+                        "sheetId":          sheet_id,
+                        "startRowIndex":    linha_ini + i - 1,   # 0-indexed
+                        "endRowIndex":      linha_ini + i,
+                        "startColumnIndex": 0,
+                        "endColumnIndex":   28,
+                    },
+                    "cell": {
+                        "userEnteredFormat": {
+                            "backgroundColor": _hex_to_rgb(cor)
+                        }
+                    },
+                    "fields": "userEnteredFormat.backgroundColor",
+                }
+            })
+        if reqs:
+            service.spreadsheets().batchUpdate(
+                spreadsheetId=spreadsheet_id,
+                body={"requests": reqs},
+            ).execute()
+
+    return linha_ini
 
 
 # ─── Interface ─────────────────────────────────────────────────────────────────
@@ -1056,10 +1134,9 @@ if st.session_state["avulso_items"]:
                 use_container_width=True,
             ):
                 try:
-                    _av_linhas  = [produto_para_linha_avulso(it) for it in _av_items]
-                    _av_ini     = inserir_linhas_sheets(_av_linhas, spreadsheet_id, creds_path)
+                    _av_ini = inserir_e_colorir_avulso(_av_items, spreadsheet_id, creds_path)
                     st.success(
-                        f"✅ **{len(_av_linhas)} item(ns)** inserido(s) com sucesso na aba "
+                        f"✅ **{len(_av_items)} item(ns)** inserido(s) com sucesso na aba "
                         f"**{_av_aba}** a partir da linha **{_av_ini}**!"
                     )
                     st.session_state["avulso_items"] = []
