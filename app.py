@@ -363,7 +363,7 @@ def inserir_linhas_sheets(linhas: list, spreadsheet_id: str, creds_path: str) ->
 # ─── Interface ─────────────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="Extrator VW — Financiamentos",
+    page_title="Flow F&I — Financiamentos VW",
     page_icon="🚗",
     layout="wide",
 )
@@ -625,7 +625,7 @@ st.markdown(f"""
     <div class="vw-logo-wrap">{_vw_inner}</div>
     <div class="vw-header-sep"></div>
     <div class="vw-header-text">
-        <h1>Extrator de Contratos</h1>
+        <h1>Flow F&amp;I</h1>
         <p>Banco Volkswagen · CCB — Processamento automatizado via Gemini AI</p>
     </div>
     <span class="vw-header-badge">Financiamentos VW</span>
