@@ -3,6 +3,8 @@ import json
 import os
 import re
 import base64
+import threading
+import time as _time
 from datetime import datetime
 from difflib import get_close_matches
 
@@ -743,16 +745,52 @@ if arquivos:
         barra = st.progress(0, text="Iniciando extração...")
 
         for i, arq in enumerate(arquivos):
-            barra.progress(i / n, text=f"Processando: **{arq.name}**")
-            try:
-                raw = extrair_contrato(arq.read(), api_key)
-                processado = aplicar_regras(raw, data_hoje)
-                processado["_arquivo"] = arq.name
-                resultados.append(processado)
-            except Exception as e:
-                erros.append({"arquivo": arq.name, "erro": str(e)})
+            _pct_ini = i / n          # início do segmento deste arquivo
+            _pct_fim = (i + 1) / n   # fim do segmento
+            _pct_alvo = _pct_ini + (_pct_fim - _pct_ini) * 0.92  # teto da animação (92%)
 
-        barra.progress(1.0, text="Extração concluída!")
+            barra.progress(_pct_ini, text=f"🔍 Lendo contrato: **{arq.name}**")
+
+            # ── Extração em thread para não bloquear a UI ─────────────────
+            _slot = {"raw": None, "err": None}
+            _pdf  = arq.read()
+
+            def _extrair(pdf=_pdf, slot=_slot):
+                try:
+                    slot["raw"] = extrair_contrato(pdf, api_key)
+                except Exception as exc:
+                    slot["err"] = str(exc)
+
+            _t = threading.Thread(target=_extrair, daemon=True)
+            _t.start()
+
+            # ── Animação da barra enquanto a API responde ─────────────────
+            # Avança ~0.5 % a cada 200 ms → preenche o segmento em ~30 s
+            _pct = float(_pct_ini)
+            _step = (_pct_alvo - _pct_ini) / 150  # 150 ticks ≈ 30 s
+            while _t.is_alive():
+                # Easing: desacelera conforme se aproxima do teto
+                _pct += _step * max(0.1, (_pct_alvo - _pct) / (_pct_alvo - _pct_ini + 1e-9))
+                _pct = min(_pct, _pct_alvo)
+                barra.progress(_pct, text=f"⏳ Gemini AI processando: **{arq.name}**")
+                _time.sleep(0.2)
+
+            _t.join()
+            # ─────────────────────────────────────────────────────────────
+
+            if _slot["err"]:
+                erros.append({"arquivo": arq.name, "erro": _slot["err"]})
+                barra.progress(_pct_fim, text=f"❌ Erro em: **{arq.name}**")
+            else:
+                try:
+                    processado = aplicar_regras(_slot["raw"], data_hoje)
+                    processado["_arquivo"] = arq.name
+                    resultados.append(processado)
+                    barra.progress(_pct_fim, text=f"✅ Concluído: **{arq.name}**")
+                except Exception as e:
+                    erros.append({"arquivo": arq.name, "erro": str(e)})
+
+        barra.progress(1.0, text="✅ Todos os contratos processados!")
 
         for erro in erros:
             st.error(f"❌ Erro em **{erro['arquivo']}**: {erro['erro']}")
