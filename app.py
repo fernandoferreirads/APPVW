@@ -892,7 +892,9 @@ with st.popover("⚙️  Configurações"):
                     except Exception:
                         st.session_state["_msal_auth_status"] = "not_auth"
 
-                threading.Thread(target=_bg_auth, daemon=True).start()
+                _bg_t = threading.Thread(target=_bg_auth, daemon=True)
+                _bg_t.start()
+                st.session_state["_msal_bg_thread"] = _bg_t
                 st.rerun()
 
     elif _auth_st == "pending":
@@ -905,6 +907,21 @@ with st.popover("⚙️  Configurações"):
         col_ok, col_cancel = st.columns(2)
         with col_ok:
             if st.button("✅ Já fiz o login", key="btn_check_auth", use_container_width=True):
+                # Se o thread em background já finalizou, o status já foi atualizado
+                if st.session_state.get("_msal_auth_status") == "authenticated":
+                    st.rerun()
+
+                # Aguarda o thread terminar (máx. 15 s) com spinner visível
+                _bg_t = st.session_state.get("_msal_bg_thread")
+                if _bg_t is not None and _bg_t.is_alive():
+                    with st.spinner("Concluindo autenticação…"):
+                        _bg_t.join(timeout=15)
+
+                # Verifica o status novamente após o join
+                if st.session_state.get("_msal_auth_status") == "authenticated":
+                    st.rerun()
+
+                # Fallback: consulta o cache diretamente (thread pode ter escrito antes de morrer)
                 _cid = st.session_state.get("_msal_client_id_flow", az_client_id)
                 _app_chk, _cache_chk = _get_msal_app(_cid)
                 _accs = _app_chk.get_accounts()
@@ -914,7 +931,7 @@ with st.popover("⚙️  Configurações"):
                     _save_msal_cache(_cache_chk)
                     st.rerun()
                 else:
-                    st.warning("Login ainda não detectado. Aguarde e tente novamente.")
+                    st.warning("⏳ Login ainda não confirmado. Se já inseriu o código, aguarde alguns segundos e tente novamente.")
         with col_cancel:
             if st.button("↩ Cancelar", key="btn_cancel_auth", use_container_width=True):
                 st.session_state["_msal_auth_status"] = "not_auth"
