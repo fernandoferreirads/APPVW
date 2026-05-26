@@ -11,8 +11,8 @@ from difflib import get_close_matches
 import pandas as pd
 from google import genai
 from google.genai import types
-from google.oauth2.service_account import Credentials as _SACredentials
-import gspread
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -371,7 +371,7 @@ def extrair_contrato(pdf_bytes: bytes, api_key: str) -> dict:
     return json.loads(texto)
 
 
-# ─── Google Sheets API ────────────────────────────────────────────────────────
+# ─── Google Sheets ─────────────────────────────────────────────────────────────
 
 # Cores de fundo por categoria de produto avulso
 CORES_CATEGORIA = {
@@ -380,14 +380,8 @@ CORES_CATEGORIA = {
     "VW Protege": "#CC00FF",  # roxo
 }
 
-_SHEETS_SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive",
-]
-
-
-def _hex_to_sheets_color(hex_color: str) -> dict:
-    """Converte cor hex (#RRGGBB) para o formato de cor do Google Sheets (float 0–1)."""
+def _hex_to_rgb(hex_color: str) -> dict:
+    """Converte cor hex (#RRGGBB) em dict {red, green, blue} com valores 0-1."""
     h = hex_color.lstrip("#")
     return {
         "red":   int(h[0:2], 16) / 255,
@@ -396,32 +390,23 @@ def _hex_to_sheets_color(hex_color: str) -> dict:
     }
 
 
-def _get_sheets_client(creds_json: str) -> gspread.Client:
-    """Cria cliente gspread autenticado via conta de serviço."""
-    info = json.loads(creds_json)
-    creds = _SACredentials.from_service_account_info(info, scopes=_SHEETS_SCOPES)
-    return gspread.authorize(creds)
-
-
-def _extract_spreadsheet_id(url: str) -> str:
-    """Extrai o ID da planilha de uma URL do Google Sheets."""
-    m = re.search(r"/spreadsheets/d/([a-zA-Z0-9\-_]+)", url)
-    if m:
-        return m.group(1)
-    # Aceita ID direto (sem URL)
-    if re.fullmatch(r"[a-zA-Z0-9\-_]{20,}", url.strip()):
-        return url.strip()
-    raise ValueError("URL do Google Sheets inválida. Não foi possível extrair o ID.")
-
-
-def _proxima_linha_sheets(ws: gspread.Worksheet) -> int:
-    """Retorna o índice (1-based) da próxima linha livre na coluna A."""
-    valores = ws.col_values(1)
-    # Desconsidera linhas vazias no final
-    ultimo = len(valores)
-    while ultimo > 0 and not str(valores[ultimo - 1]).strip():
-        ultimo -= 1
-    return ultimo + 1
+def get_sheets_service(creds_path: str):
+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    # Streamlit Cloud: lê credenciais dos secrets
+    try:
+        if "gcp_service_account" in st.secrets:
+            creds = service_account.Credentials.from_service_account_info(
+                dict(st.secrets["gcp_service_account"]),
+                scopes=scopes,
+            )
+            return build("sheets", "v4", credentials=creds)
+    except Exception:
+        pass
+    # Local: lê do arquivo JSON
+    creds = service_account.Credentials.from_service_account_file(
+        creds_path, scopes=scopes,
+    )
+    return build("sheets", "v4", credentials=creds)
 
 
 def nome_aba_atual() -> str:
@@ -429,73 +414,82 @@ def nome_aba_atual() -> str:
     return f"{MESES_PT[now.month]} {now.year}"
 
 
-def inserir_linhas_sheets(
-    linhas: list,
-    creds_json: str,
-    sheets_url: str,
-) -> int:
-    """Insere linhas de contratos no Google Sheets."""
-    client    = _get_sheets_client(creds_json)
-    sp_id     = _extract_spreadsheet_id(sheets_url)
-    planilha  = client.open_by_key(sp_id)
-    aba       = nome_aba_atual()
-    try:
-        ws = planilha.worksheet(aba)
-    except gspread.WorksheetNotFound:
-        raise Exception(f"Aba '{aba}' não encontrada na planilha.")
+def inserir_linhas_sheets(linhas: list, spreadsheet_id: str, creds_path: str) -> int:
+    service = get_sheets_service(creds_path)
+    aba = nome_aba_atual()
 
-    linha_ini = _proxima_linha_sheets(ws)
-    ws.update(f"A{linha_ini}", linhas)
-    return linha_ini
+    resultado = service.spreadsheets().values().get(
+        spreadsheetId=spreadsheet_id,
+        range=f"'{aba}'!A:A",
+    ).execute()
+    proxima_linha = len(resultado.get("values", [])) + 1
+
+    service.spreadsheets().values().update(
+        spreadsheetId=spreadsheet_id,
+        range=f"'{aba}'!A{proxima_linha}",
+        valueInputOption="USER_ENTERED",
+        body={"values": linhas},
+    ).execute()
+    return proxima_linha
 
 
-def inserir_e_colorir_sheets(
-    itens: list,
-    creds_json: str,
-    sheets_url: str,
-) -> int:
-    """Insere produtos avulsos e pinta cada linha pela categoria."""
-    client    = _get_sheets_client(creds_json)
-    sp_id     = _extract_spreadsheet_id(sheets_url)
-    planilha  = client.open_by_key(sp_id)
-    aba       = nome_aba_atual()
-    try:
-        ws = planilha.worksheet(aba)
-    except gspread.WorksheetNotFound:
-        raise Exception(f"Aba '{aba}' não encontrada na planilha.")
+def inserir_e_colorir_avulso(itens: list, spreadsheet_id: str, creds_path: str) -> int:
+    """Insere linhas avulsas no Sheets e pinta cada linha com a cor da categoria."""
+    service  = get_sheets_service(creds_path)
+    aba      = nome_aba_atual()
 
-    linha_ini = _proxima_linha_sheets(ws)
-    linhas    = [produto_para_linha_avulso(it) for it in itens]
-    ws.update(f"A{linha_ini}", linhas)
+    # Próxima linha disponível
+    res       = service.spreadsheets().values().get(
+        spreadsheetId=spreadsheet_id, range=f"'{aba}'!A:A"
+    ).execute()
+    linha_ini = len(res.get("values", [])) + 1
 
-    # Colorir por categoria via batchUpdate
-    ws_id     = ws._properties["sheetId"]
-    requests_ = []
-    for i, item in enumerate(itens):
-        cor = CORES_CATEGORIA.get(item["categoria"])
-        if not cor:
-            continue
-        row = linha_ini - 1 + i   # 0-based para a API
-        requests_.append({
-            "repeatCell": {
-                "range": {
-                    "sheetId":          ws_id,
-                    "startRowIndex":    row,
-                    "endRowIndex":      row + 1,
-                    "startColumnIndex": 0,
-                    "endColumnIndex":   28,
-                },
-                "cell": {
-                    "userEnteredFormat": {
-                        "backgroundColor": _hex_to_sheets_color(cor),
-                    }
-                },
-                "fields": "userEnteredFormat.backgroundColor",
-            }
-        })
+    # Insere os dados
+    linhas = [produto_para_linha_avulso(it) for it in itens]
+    service.spreadsheets().values().update(
+        spreadsheetId=spreadsheet_id,
+        range=f"'{aba}'!A{linha_ini}",
+        valueInputOption="USER_ENTERED",
+        body={"values": linhas},
+    ).execute()
 
-    if requests_:
-        planilha.batch_update({"requests": requests_})
+    # Obtém sheetId numérico da aba pelo nome
+    meta     = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+    sheet_id = next(
+        (s["properties"]["sheetId"] for s in meta["sheets"]
+         if s["properties"]["title"] == aba),
+        None,
+    )
+
+    # Aplica cor de fundo a cada linha conforme categoria
+    if sheet_id is not None:
+        reqs = []
+        for i, item in enumerate(itens):
+            cor = CORES_CATEGORIA.get(item["categoria"])
+            if not cor:
+                continue
+            reqs.append({
+                "repeatCell": {
+                    "range": {
+                        "sheetId":          sheet_id,
+                        "startRowIndex":    linha_ini + i - 1,   # 0-indexed
+                        "endRowIndex":      linha_ini + i,
+                        "startColumnIndex": 0,
+                        "endColumnIndex":   28,
+                    },
+                    "cell": {
+                        "userEnteredFormat": {
+                            "backgroundColor": _hex_to_rgb(cor)
+                        }
+                    },
+                    "fields": "userEnteredFormat.backgroundColor",
+                }
+            })
+        if reqs:
+            service.spreadsheets().batchUpdate(
+                spreadsheetId=spreadsheet_id,
+                body={"requests": reqs},
+            ).execute()
 
     return linha_ini
 
@@ -794,21 +788,14 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ── Configurações (popover — botão nativo, painel flutuante) ──────────────────
-_gemini_default  = os.getenv("GEMINI_API_KEY")       or st.secrets.get("GEMINI_API_KEY",       "")
-_sheets_url_def  = os.getenv("SHEETS_URL")           or st.secrets.get("SHEETS_URL",           "")
-_creds_json_def  = os.getenv("GOOGLE_CREDENTIALS_JSON") or st.secrets.get("GOOGLE_CREDENTIALS_JSON", "")
+_gemini_default = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY", "")
+_sid_default    = os.getenv("SPREADSHEET_ID") or st.secrets.get("SPREADSHEET_ID", "")
 
-# Credenciais via estrutura nativa do Streamlit (gcp_service_account)
-if not _creds_json_def:
-    try:
-        _gcp = st.secrets.get("gcp_service_account")
-        if _gcp:
-            _creds_json_def = json.dumps(dict(_gcp))
-    except Exception:
-        pass
-
+# st.popover: botão sempre visível, abre popup ao clicar.
+# O bloco interno SEMPRE executa a cada rerun (como st.expander),
+# então todas as variáveis ficam disponíveis no escopo global.
 with st.popover("⚙️  Configurações"):
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         api_key = st.text_input(
             "Gemini API Key",
@@ -818,27 +805,38 @@ with st.popover("⚙️  Configurações"):
             key="cfg_api_key",
         )
     with col2:
-        sheets_url = st.text_input(
-            "Link do Google Sheets",
-            value=_sheets_url_def,
-            help="Abra a planilha → copie a URL do navegador",
-            key="cfg_sheets_url",
+        _sid_raw = st.text_input(
+            "ID do Google Sheets",
+            value=_sid_default,
+            help="ID da planilha na URL: docs.google.com/spreadsheets/d/[ID]/edit",
+            key="cfg_sheets_id",
+        )
+    with col3:
+        creds_path_raw = st.text_input(
+            "Credenciais Google (JSON)",
+            value=os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials/service_account.json"),
+            help="Caminho para o arquivo JSON da conta de serviço",
+            key="cfg_creds_path",
         )
 
-    # Credenciais da conta de serviço
-    creds_json = st.text_area(
-        "Credenciais da Conta de Serviço (JSON)",
-        value=_creds_json_def,
-        height=100,
-        help='Cole aqui o conteúdo do arquivo JSON baixado do Google Cloud Console. '
-             'Em produção, prefira configurar em st.secrets["GOOGLE_CREDENTIALS_JSON"].',
-        key="cfg_creds_json",
-        placeholder='{"type": "service_account", "project_id": "...", ...}',
+    # Aceita URL completa ou só o ID — extrai apenas o ID
+    _sid_match = re.search(r'spreadsheets/d/([a-zA-Z0-9_-]+)', _sid_raw)
+    spreadsheet_id = _sid_match.group(1) if _sid_match else _sid_raw.strip()
+
+    # Resolve caminho relativo à pasta do app.py
+    _app_dir = os.path.dirname(os.path.abspath(__file__))
+    creds_path = (
+        creds_path_raw if os.path.isabs(creds_path_raw)
+        else os.path.join(_app_dir, creds_path_raw)
     )
 
-    sheets_ok = bool(sheets_url and creds_json)
-    if not sheets_ok:
-        st.caption("💡 Preencha o link da planilha e as credenciais para habilitar a inserção.")
+    # Sheets OK: arquivo local OU secrets da nuvem configurados
+    _secrets_ok = "gcp_service_account" in st.secrets
+    sheets_ok = bool(spreadsheet_id) and (os.path.exists(creds_path) or _secrets_ok)
+    if sheets_ok:
+        st.success("Google Sheets configurado ✓")
+    else:
+        st.warning("Configure o ID da planilha e as credenciais Google para habilitar a inserção.")
 
 # ── Upload ───────────────────────────────────────────────────────────────────
 st.markdown("""
@@ -992,12 +990,12 @@ if st.session_state.get("resultados"):
         label_btn = f"✅ Inserir {len(resultados)} linha(s) na planilha → aba {aba_atual}"
 
         if not sheets_ok:
-            st.warning("Preencha o link da planilha e as credenciais para habilitar a inserção.")
+            st.warning("Configure o Google Sheets na barra lateral para habilitar a inserção.")
         else:
             if st.button(label_btn, type="primary", use_container_width=True):
                 try:
-                    linhas    = [para_linha_sheets(r) for r in resultados]
-                    linha_ini = inserir_linhas_sheets(linhas, creds_json, sheets_url)
+                    linhas = [para_linha_sheets(r) for r in resultados]
+                    linha_ini = inserir_linhas_sheets(linhas, spreadsheet_id, creds_path)
                     st.success(
                         f"✅ **{len(linhas)} linha(s)** inserida(s) com sucesso na aba "
                         f"**{aba_atual}** a partir da linha **{linha_ini}**!"
@@ -1005,7 +1003,7 @@ if st.session_state.get("resultados"):
                     del st.session_state["resultados"]
                     st.balloons()
                 except Exception as e:
-                    st.error(f"❌ Erro ao inserir no Sheets: {e}")
+                    st.error(f"❌ Erro ao inserir na planilha: {e}")
 
 # ── Cadastro Avulso ───────────────────────────────────────────────────────────
 st.markdown(
@@ -1127,7 +1125,7 @@ if st.session_state["avulso_items"]:
     with col_av_ins:
         _av_aba = nome_aba_atual()
         if not sheets_ok:
-            st.warning("Preencha o link da planilha e as credenciais para habilitar a inserção.")
+            st.warning("Configure o Google Sheets nas configurações para habilitar a inserção.")
         else:
             if st.button(
                 f"✅ Inserir {len(_av_items)} item(ns) na planilha → aba {_av_aba}",
@@ -1136,7 +1134,7 @@ if st.session_state["avulso_items"]:
                 use_container_width=True,
             ):
                 try:
-                    _av_ini = inserir_e_colorir_sheets(_av_items, creds_json, sheets_url)
+                    _av_ini = inserir_e_colorir_avulso(_av_items, spreadsheet_id, creds_path)
                     st.success(
                         f"✅ **{len(_av_items)} item(ns)** inserido(s) com sucesso na aba "
                         f"**{_av_aba}** a partir da linha **{_av_ini}**!"
