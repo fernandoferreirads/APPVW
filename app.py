@@ -876,6 +876,7 @@ with st.popover("⚙️  Configurações"):
                 st.session_state["_msal_device_flow"]    = _flow
                 st.session_state["_msal_client_id_flow"] = az_client_id
                 st.session_state["_msal_auth_status"]    = "pending"
+                st.session_state.pop("_msal_auth_error", None)
 
                 def _bg_auth(flow=_flow, cid=az_client_id):
                     try:
@@ -888,8 +889,14 @@ with st.popover("⚙️  Configurações"):
                                 r.get("id_token_claims", {}).get("preferred_username", "")
                             )
                         else:
+                            _err = (r or {}).get(
+                                "error_description",
+                                (r or {}).get("error", "Resposta inválida do servidor"),
+                            )
+                            st.session_state["_msal_auth_error"]  = _err
                             st.session_state["_msal_auth_status"] = "not_auth"
-                    except Exception:
+                    except Exception as _exc:
+                        st.session_state["_msal_auth_error"]  = str(_exc)
                         st.session_state["_msal_auth_status"] = "not_auth"
 
                 _bg_t = threading.Thread(target=_bg_auth, daemon=True)
@@ -907,35 +914,44 @@ with st.popover("⚙️  Configurações"):
         col_ok, col_cancel = st.columns(2)
         with col_ok:
             if st.button("✅ Já fiz o login", key="btn_check_auth", use_container_width=True):
-                # Se o thread em background já finalizou, o status já foi atualizado
-                if st.session_state.get("_msal_auth_status") == "authenticated":
-                    st.rerun()
-
-                # Aguarda o thread terminar (máx. 15 s) com spinner visível
-                _bg_t = st.session_state.get("_msal_bg_thread")
-                if _bg_t is not None and _bg_t.is_alive():
-                    with st.spinner("Concluindo autenticação…"):
-                        _bg_t.join(timeout=15)
-
-                # Verifica o status novamente após o join
-                if st.session_state.get("_msal_auth_status") == "authenticated":
-                    st.rerun()
-
-                # Fallback: consulta o cache diretamente (thread pode ter escrito antes de morrer)
-                _cid = st.session_state.get("_msal_client_id_flow", az_client_id)
-                _app_chk, _cache_chk = _get_msal_app(_cid)
-                _accs = _app_chk.get_accounts()
-                if _accs:
-                    st.session_state["_msal_auth_status"] = "authenticated"
-                    st.session_state["_msal_user_email"]  = _accs[0].get("username", "")
-                    _save_msal_cache(_cache_chk)
-                    st.rerun()
-                else:
-                    st.warning("⏳ Login ainda não confirmado. Se já inseriu o código, aguarde alguns segundos e tente novamente.")
+                # Não sobrescreve se o thread já concluiu com sucesso
+                if st.session_state.get("_msal_auth_status") != "authenticated":
+                    st.session_state["_msal_auth_status"] = "checking"
+                st.rerun()
         with col_cancel:
             if st.button("↩ Cancelar", key="btn_cancel_auth", use_container_width=True):
                 st.session_state["_msal_auth_status"] = "not_auth"
                 st.rerun()
+
+    elif _auth_st == "checking":
+        _bg_t    = st.session_state.get("_msal_bg_thread")
+        _alive   = _bg_t is not None and _bg_t.is_alive()
+
+        if _alive:
+            # Thread ainda está rodando — aguarda e verifica de novo
+            st.info("⏳ Aguardando confirmação do Microsoft… (pode levar alguns segundos)")
+            _time.sleep(3)
+            st.rerun()
+        else:
+            # Thread concluiu — verifica o cache diretamente
+            _cid = st.session_state.get("_msal_client_id_flow", az_client_id)
+            _app_chk, _cache_chk = _get_msal_app(_cid)
+            _accs = _app_chk.get_accounts()
+            if _accs:
+                st.session_state["_msal_auth_status"] = "authenticated"
+                st.session_state["_msal_user_email"]  = _accs[0].get("username", "")
+                _save_msal_cache(_cache_chk)
+                st.rerun()
+            else:
+                _err_msg = st.session_state.get("_msal_auth_error", "")
+                st.error(
+                    "❌ Autenticação não concluída."
+                    + (f"\n\nDetalhe: `{_err_msg}`" if _err_msg else "")
+                )
+                if st.button("↩ Tentar novamente", key="btn_retry_auth", use_container_width=True):
+                    st.session_state["_msal_auth_status"] = "not_auth"
+                    st.session_state.pop("_msal_auth_error", None)
+                    st.rerun()
 
     elif _auth_st == "authenticated":
         _user_email = st.session_state.get("_msal_user_email", "")
