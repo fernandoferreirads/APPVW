@@ -11,9 +11,8 @@ from difflib import get_close_matches
 import pandas as pd
 from google import genai
 from google.genai import types
-import msal
-import requests
-from urllib.parse import quote as _url_quote
+from google.oauth2.service_account import Credentials as _SACredentials
+import gspread
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -372,7 +371,7 @@ def extrair_contrato(pdf_bytes: bytes, api_key: str) -> dict:
     return json.loads(texto)
 
 
-# ─── Microsoft Graph API — Excel Online ───────────────────────────────────────
+# ─── Google Sheets API ────────────────────────────────────────────────────────
 
 # Cores de fundo por categoria de produto avulso
 CORES_CATEGORIA = {
@@ -381,81 +380,48 @@ CORES_CATEGORIA = {
     "VW Protege": "#CC00FF",  # roxo
 }
 
-
-# Escopos delegados necessários para acesso ao OneDrive pessoal
-_GRAPH_SCOPES = ["https://graph.microsoft.com/Files.ReadWrite"]
-
-
-def _get_msal_app(client_id: str) -> tuple:
-    """Cria PublicClientApplication com cache serializado em session_state."""
-    cache = msal.SerializableTokenCache()
-    if st.session_state.get("_msal_cache"):
-        cache.deserialize(st.session_state["_msal_cache"])
-    app = msal.PublicClientApplication(
-        client_id,
-        authority="https://login.microsoftonline.com/common",
-        token_cache=cache,
-    )
-    return app, cache
+_SHEETS_SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+]
 
 
-def _save_msal_cache(cache: msal.SerializableTokenCache) -> None:
-    if cache.has_state_changed:
-        st.session_state["_msal_cache"] = cache.serialize()
+def _hex_to_sheets_color(hex_color: str) -> dict:
+    """Converte cor hex (#RRGGBB) para o formato de cor do Google Sheets (float 0–1)."""
+    h = hex_color.lstrip("#")
+    return {
+        "red":   int(h[0:2], 16) / 255,
+        "green": int(h[2:4], 16) / 255,
+        "blue":  int(h[4:6], 16) / 255,
+    }
 
 
-def _get_valid_token(client_id: str) -> str:
-    """Obtém token delegado da cache. Lança exceção se não autenticado."""
-    app, cache = _get_msal_app(client_id)
-    accounts = app.get_accounts()
-    if not accounts:
-        raise Exception(
-            "Não autenticado. Clique em '🔑 Conectar Microsoft' nas Configurações."
-        )
-    result = app.acquire_token_silent(_GRAPH_SCOPES, account=accounts[0])
-    _save_msal_cache(cache)
-    if result and "access_token" in result:
-        return result["access_token"]
-    raise Exception("Sessão expirada. Faça login novamente nas Configurações.")
+def _get_sheets_client(creds_json: str) -> gspread.Client:
+    """Cria cliente gspread autenticado via conta de serviço."""
+    info = json.loads(creds_json)
+    creds = _SACredentials.from_service_account_info(info, scopes=_SHEETS_SCOPES)
+    return gspread.authorize(creds)
 
 
-def _resolve_excel_ids(token: str, sharing_url: str) -> tuple:
-    """Resolve sharing URL do OneDrive/SharePoint → (drive_id, item_id)."""
-    encoded = base64.urlsafe_b64encode(sharing_url.encode()).decode().rstrip("=")
-    r = requests.get(
-        f"https://graph.microsoft.com/v1.0/shares/u!{encoded}/driveItem",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    r.raise_for_status()
-    d = r.json()
-    return d["parentReference"]["driveId"], d["id"]
+def _extract_spreadsheet_id(url: str) -> str:
+    """Extrai o ID da planilha de uma URL do Google Sheets."""
+    m = re.search(r"/spreadsheets/d/([a-zA-Z0-9\-_]+)", url)
+    if m:
+        return m.group(1)
+    # Aceita ID direto (sem URL)
+    if re.fullmatch(r"[a-zA-Z0-9\-_]{20,}", url.strip()):
+        return url.strip()
+    raise ValueError("URL do Google Sheets inválida. Não foi possível extrair o ID.")
 
 
-def _get_ws_id(token: str, drive_id: str, item_id: str, sheet_name: str) -> str:
-    """Retorna o ID interno da aba (worksheet) pelo nome."""
-    r = requests.get(
-        f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}"
-        f"/workbook/worksheets",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    r.raise_for_status()
-    for ws in r.json().get("value", []):
-        if ws["name"] == sheet_name:
-            return ws["id"]
-    raise Exception(f"Aba '{sheet_name}' não encontrada no arquivo Excel.")
-
-
-def _proxima_linha_excel(token: str, base_url: str) -> int:
-    """Retorna a próxima linha livre com base no usedRange da aba."""
-    r = requests.get(
-        f"{base_url}/usedRange",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    try:
-        rc = r.json().get("rowCount", 0) if r.status_code == 200 else 0
-    except Exception:
-        rc = 0
-    return rc + 1 if rc > 0 else 1
+def _proxima_linha_sheets(ws: gspread.Worksheet) -> int:
+    """Retorna o índice (1-based) da próxima linha livre na coluna A."""
+    valores = ws.col_values(1)
+    # Desconsidera linhas vazias no final
+    ultimo = len(valores)
+    while ultimo > 0 and not str(valores[ultimo - 1]).strip():
+        ultimo -= 1
+    return ultimo + 1
 
 
 def nome_aba_atual() -> str:
@@ -463,71 +429,73 @@ def nome_aba_atual() -> str:
     return f"{MESES_PT[now.month]} {now.year}"
 
 
-def inserir_linhas_excel(
+def inserir_linhas_sheets(
     linhas: list,
-    client_id: str, sharing_url: str,
+    creds_json: str,
+    sheets_url: str,
 ) -> int:
-    """Insere linhas de contratos no Excel Online via Microsoft Graph API."""
-    token             = _get_valid_token(client_id)
-    drive_id, item_id = _resolve_excel_ids(token, sharing_url)
-    aba               = nome_aba_atual()
-    ws_id             = _get_ws_id(token, drive_id, item_id, aba)
-    hdrs              = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    base              = (
-        f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}"
-        f"/workbook/worksheets/{_url_quote(ws_id)}"
-    )
+    """Insere linhas de contratos no Google Sheets."""
+    client    = _get_sheets_client(creds_json)
+    sp_id     = _extract_spreadsheet_id(sheets_url)
+    planilha  = client.open_by_key(sp_id)
+    aba       = nome_aba_atual()
+    try:
+        ws = planilha.worksheet(aba)
+    except gspread.WorksheetNotFound:
+        raise Exception(f"Aba '{aba}' não encontrada na planilha.")
 
-    linha_ini = _proxima_linha_excel(token, base)
-    n         = len(linhas)
-    address   = f"A{linha_ini}:AB{linha_ini + n - 1}"
-    r = requests.patch(
-        f"{base}/range(address='{address}')",
-        headers=hdrs,
-        json={"values": linhas},
-    )
-    r.raise_for_status()
+    linha_ini = _proxima_linha_sheets(ws)
+    ws.update(f"A{linha_ini}", linhas)
     return linha_ini
 
 
-def inserir_e_colorir_excel(
+def inserir_e_colorir_sheets(
     itens: list,
-    client_id: str, sharing_url: str,
+    creds_json: str,
+    sheets_url: str,
 ) -> int:
-    """Insere linhas avulsas no Excel Online e pinta cada linha pela categoria."""
-    token             = _get_valid_token(client_id)
-    drive_id, item_id = _resolve_excel_ids(token, sharing_url)
-    aba               = nome_aba_atual()
-    ws_id             = _get_ws_id(token, drive_id, item_id, aba)
-    hdrs              = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    base              = (
-        f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}"
-        f"/workbook/worksheets/{_url_quote(ws_id)}"
-    )
+    """Insere produtos avulsos e pinta cada linha pela categoria."""
+    client    = _get_sheets_client(creds_json)
+    sp_id     = _extract_spreadsheet_id(sheets_url)
+    planilha  = client.open_by_key(sp_id)
+    aba       = nome_aba_atual()
+    try:
+        ws = planilha.worksheet(aba)
+    except gspread.WorksheetNotFound:
+        raise Exception(f"Aba '{aba}' não encontrada na planilha.")
 
-    linha_ini = _proxima_linha_excel(token, base)
+    linha_ini = _proxima_linha_sheets(ws)
     linhas    = [produto_para_linha_avulso(it) for it in itens]
-    n         = len(linhas)
-    address   = f"A{linha_ini}:AB{linha_ini + n - 1}"
-    r = requests.patch(
-        f"{base}/range(address='{address}')",
-        headers=hdrs,
-        json={"values": linhas},
-    )
-    r.raise_for_status()
+    ws.update(f"A{linha_ini}", linhas)
 
-    # Aplica cor de fundo por categoria
+    # Colorir por categoria via batchUpdate
+    ws_id     = ws._properties["sheetId"]
+    requests_ = []
     for i, item in enumerate(itens):
         cor = CORES_CATEGORIA.get(item["categoria"])
         if not cor:
             continue
-        row = linha_ini + i
-        r = requests.patch(
-            f"{base}/range(address='A{row}:AB{row}')/format/fill",
-            headers=hdrs,
-            json={"color": cor},
-        )
-        r.raise_for_status()
+        row = linha_ini - 1 + i   # 0-based para a API
+        requests_.append({
+            "repeatCell": {
+                "range": {
+                    "sheetId":          ws_id,
+                    "startRowIndex":    row,
+                    "endRowIndex":      row + 1,
+                    "startColumnIndex": 0,
+                    "endColumnIndex":   28,
+                },
+                "cell": {
+                    "userEnteredFormat": {
+                        "backgroundColor": _hex_to_sheets_color(cor),
+                    }
+                },
+                "fields": "userEnteredFormat.backgroundColor",
+            }
+        })
+
+    if requests_:
+        planilha.batch_update({"requests": requests_})
 
     return linha_ini
 
@@ -826,9 +794,18 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ── Configurações (popover — botão nativo, painel flutuante) ──────────────────
-_gemini_default    = os.getenv("GEMINI_API_KEY")    or st.secrets.get("GEMINI_API_KEY",    "")
-_client_id_default = os.getenv("AZURE_CLIENT_ID")   or st.secrets.get("AZURE_CLIENT_ID",   "")
-_excel_url_default = os.getenv("EXCEL_SHARING_URL") or st.secrets.get("EXCEL_SHARING_URL", "")
+_gemini_default  = os.getenv("GEMINI_API_KEY")       or st.secrets.get("GEMINI_API_KEY",       "")
+_sheets_url_def  = os.getenv("SHEETS_URL")           or st.secrets.get("SHEETS_URL",           "")
+_creds_json_def  = os.getenv("GOOGLE_CREDENTIALS_JSON") or st.secrets.get("GOOGLE_CREDENTIALS_JSON", "")
+
+# Credenciais via estrutura nativa do Streamlit (gcp_service_account)
+if not _creds_json_def:
+    try:
+        _gcp = st.secrets.get("gcp_service_account")
+        if _gcp:
+            _creds_json_def = json.dumps(dict(_gcp))
+    except Exception:
+        pass
 
 with st.popover("⚙️  Configurações"):
     col1, col2 = st.columns(2)
@@ -841,136 +818,27 @@ with st.popover("⚙️  Configurações"):
             key="cfg_api_key",
         )
     with col2:
-        az_client_id = st.text_input(
-            "Azure Client ID",
-            value=_client_id_default,
-            type="password",
-            help="ID do aplicativo — Azure App Registration → Visão geral",
-            key="cfg_client_id",
+        sheets_url = st.text_input(
+            "Link do Google Sheets",
+            value=_sheets_url_def,
+            help="Abra a planilha → copie a URL do navegador",
+            key="cfg_sheets_url",
         )
-    excel_url = st.text_input(
-        "Link do Excel Online",
-        value=_excel_url_default,
-        help="OneDrive → clique no arquivo → Compartilhar → Copiar link",
-        key="cfg_excel_url",
+
+    # Credenciais da conta de serviço
+    creds_json = st.text_area(
+        "Credenciais da Conta de Serviço (JSON)",
+        value=_creds_json_def,
+        height=100,
+        help='Cole aqui o conteúdo do arquivo JSON baixado do Google Cloud Console. '
+             'Em produção, prefira configurar em st.secrets["GOOGLE_CREDENTIALS_JSON"].',
+        key="cfg_creds_json",
+        placeholder='{"type": "service_account", "project_id": "...", ...}',
     )
 
-    st.divider()
-
-    # ── Login Microsoft (device code flow) ───────────────────────────────────
-    _auth_st = st.session_state.get("_msal_auth_status", "not_auth")
-
-    if _auth_st == "not_auth":
-        _btn_login = st.button(
-            "🔑 Conectar conta Microsoft",
-            key="btn_ms_login",
-            use_container_width=True,
-            disabled=not az_client_id,
-        )
-        if _btn_login and az_client_id:
-            _app_tmp, _ = _get_msal_app(az_client_id)
-            _flow = _app_tmp.initiate_device_flow(scopes=_GRAPH_SCOPES)
-            if "user_code" not in _flow:
-                st.error(f"Erro ao iniciar login: {_flow.get('error_description', _flow)}")
-            else:
-                st.session_state["_msal_device_flow"]    = _flow
-                st.session_state["_msal_client_id_flow"] = az_client_id
-                st.session_state["_msal_auth_status"]    = "pending"
-                st.session_state.pop("_msal_auth_error", None)
-
-                def _bg_auth(flow=_flow, cid=az_client_id):
-                    try:
-                        _a, _c = _get_msal_app(cid)
-                        r = _a.acquire_token_by_device_flow(flow)
-                        _save_msal_cache(_c)
-                        if r and "access_token" in r:
-                            st.session_state["_msal_auth_status"] = "authenticated"
-                            st.session_state["_msal_user_email"]  = (
-                                r.get("id_token_claims", {}).get("preferred_username", "")
-                            )
-                        else:
-                            _err = (r or {}).get(
-                                "error_description",
-                                (r or {}).get("error", "Resposta inválida do servidor"),
-                            )
-                            st.session_state["_msal_auth_error"]  = _err
-                            st.session_state["_msal_auth_status"] = "not_auth"
-                    except Exception as _exc:
-                        st.session_state["_msal_auth_error"]  = str(_exc)
-                        st.session_state["_msal_auth_status"] = "not_auth"
-
-                _bg_t = threading.Thread(target=_bg_auth, daemon=True)
-                _bg_t.start()
-                st.session_state["_msal_bg_thread"] = _bg_t
-                st.rerun()
-
-    elif _auth_st == "pending":
-        _flow = st.session_state.get("_msal_device_flow", {})
-        st.info(
-            f"**1.** Acesse: **{_flow.get('verification_uri', 'https://microsoft.com/devicelogin')}**\n\n"
-            f"**2.** Insira o código: **`{_flow.get('user_code', '...')}`**\n\n"
-            f"**3.** Faça login com sua conta Microsoft e clique abaixo"
-        )
-        col_ok, col_cancel = st.columns(2)
-        with col_ok:
-            if st.button("✅ Já fiz o login", key="btn_check_auth", use_container_width=True):
-                # Não sobrescreve se o thread já concluiu com sucesso
-                if st.session_state.get("_msal_auth_status") != "authenticated":
-                    st.session_state["_msal_auth_status"] = "checking"
-                st.rerun()
-        with col_cancel:
-            if st.button("↩ Cancelar", key="btn_cancel_auth", use_container_width=True):
-                st.session_state["_msal_auth_status"] = "not_auth"
-                st.rerun()
-
-    elif _auth_st == "checking":
-        _bg_t    = st.session_state.get("_msal_bg_thread")
-        _alive   = _bg_t is not None and _bg_t.is_alive()
-
-        if _alive:
-            # Thread ainda está rodando — aguarda e verifica de novo
-            st.info("⏳ Aguardando confirmação do Microsoft… (pode levar alguns segundos)")
-            _time.sleep(3)
-            st.rerun()
-        else:
-            # Thread concluiu — verifica o cache diretamente
-            _cid = st.session_state.get("_msal_client_id_flow", az_client_id)
-            _app_chk, _cache_chk = _get_msal_app(_cid)
-            _accs = _app_chk.get_accounts()
-            if _accs:
-                st.session_state["_msal_auth_status"] = "authenticated"
-                st.session_state["_msal_user_email"]  = _accs[0].get("username", "")
-                _save_msal_cache(_cache_chk)
-                st.rerun()
-            else:
-                _err_msg = st.session_state.get("_msal_auth_error", "")
-                st.error(
-                    "❌ Autenticação não concluída."
-                    + (f"\n\nDetalhe: `{_err_msg}`" if _err_msg else "")
-                )
-                if st.button("↩ Tentar novamente", key="btn_retry_auth", use_container_width=True):
-                    st.session_state["_msal_auth_status"] = "not_auth"
-                    st.session_state.pop("_msal_auth_error", None)
-                    st.rerun()
-
-    elif _auth_st == "authenticated":
-        _user_email = st.session_state.get("_msal_user_email", "")
-        st.success(f"✅ Conectado: **{_user_email}**")
-        if st.button("🚪 Desconectar", key="btn_ms_logout", use_container_width=True):
-            _app_lo, _ = _get_msal_app(az_client_id)
-            for _acc in _app_lo.get_accounts():
-                _app_lo.remove_account(_acc)
-            st.session_state["_msal_cache"]       = None
-            st.session_state["_msal_auth_status"] = "not_auth"
-            st.session_state.pop("_msal_user_email", None)
-            st.rerun()
-
-    excel_ok = (
-        bool(az_client_id and excel_url) and
-        st.session_state.get("_msal_auth_status") == "authenticated"
-    )
-    if not excel_ok and _auth_st not in ("pending", "authenticated"):
-        st.caption("💡 Preencha o Client ID, o Link do Excel e faça login para inserir dados.")
+    sheets_ok = bool(sheets_url and creds_json)
+    if not sheets_ok:
+        st.caption("💡 Preencha o link da planilha e as credenciais para habilitar a inserção.")
 
 # ── Upload ───────────────────────────────────────────────────────────────────
 st.markdown("""
@@ -1123,13 +991,13 @@ if st.session_state.get("resultados"):
         aba_atual = nome_aba_atual()
         label_btn = f"✅ Inserir {len(resultados)} linha(s) na planilha → aba {aba_atual}"
 
-        if not excel_ok:
-            st.warning("Preencha as configurações do Excel Online para habilitar a inserção.")
+        if not sheets_ok:
+            st.warning("Preencha o link da planilha e as credenciais para habilitar a inserção.")
         else:
             if st.button(label_btn, type="primary", use_container_width=True):
                 try:
                     linhas    = [para_linha_sheets(r) for r in resultados]
-                    linha_ini = inserir_linhas_excel(linhas, az_client_id, excel_url)
+                    linha_ini = inserir_linhas_sheets(linhas, creds_json, sheets_url)
                     st.success(
                         f"✅ **{len(linhas)} linha(s)** inserida(s) com sucesso na aba "
                         f"**{aba_atual}** a partir da linha **{linha_ini}**!"
@@ -1137,7 +1005,7 @@ if st.session_state.get("resultados"):
                     del st.session_state["resultados"]
                     st.balloons()
                 except Exception as e:
-                    st.error(f"❌ Erro ao inserir no Excel: {e}")
+                    st.error(f"❌ Erro ao inserir no Sheets: {e}")
 
 # ── Cadastro Avulso ───────────────────────────────────────────────────────────
 st.markdown(
@@ -1258,8 +1126,8 @@ if st.session_state["avulso_items"]:
 
     with col_av_ins:
         _av_aba = nome_aba_atual()
-        if not excel_ok:
-            st.warning("Preencha as configurações do Excel Online para habilitar a inserção.")
+        if not sheets_ok:
+            st.warning("Preencha o link da planilha e as credenciais para habilitar a inserção.")
         else:
             if st.button(
                 f"✅ Inserir {len(_av_items)} item(ns) na planilha → aba {_av_aba}",
@@ -1268,7 +1136,7 @@ if st.session_state["avulso_items"]:
                 use_container_width=True,
             ):
                 try:
-                    _av_ini = inserir_e_colorir_excel(_av_items, az_client_id, excel_url)
+                    _av_ini = inserir_e_colorir_sheets(_av_items, creds_json, sheets_url)
                     st.success(
                         f"✅ **{len(_av_items)} item(ns)** inserido(s) com sucesso na aba "
                         f"**{_av_aba}** a partir da linha **{_av_ini}**!"
