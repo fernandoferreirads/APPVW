@@ -383,10 +383,7 @@ CORES_CATEGORIA = {
 
 
 # Escopos delegados necessários para acesso ao OneDrive pessoal
-_GRAPH_SCOPES = [
-    "https://graph.microsoft.com/Files.ReadWrite",
-    "offline_access",
-]
+_GRAPH_SCOPES = ["https://graph.microsoft.com/Files.ReadWrite"]
 
 
 def _get_msal_app(client_id: str) -> tuple:
