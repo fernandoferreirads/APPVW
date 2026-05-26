@@ -382,19 +382,44 @@ CORES_CATEGORIA = {
 }
 
 
-def _graph_token(tenant_id: str, client_id: str, client_secret: str) -> str:
-    """Obtém access token via client credentials flow (MSAL)."""
-    _msal_app = msal.ConfidentialClientApplication(
+# Escopos delegados necessários para acesso ao OneDrive pessoal
+_GRAPH_SCOPES = [
+    "https://graph.microsoft.com/Files.ReadWrite",
+    "offline_access",
+]
+
+
+def _get_msal_app(client_id: str) -> tuple:
+    """Cria PublicClientApplication com cache serializado em session_state."""
+    cache = msal.SerializableTokenCache()
+    if st.session_state.get("_msal_cache"):
+        cache.deserialize(st.session_state["_msal_cache"])
+    app = msal.PublicClientApplication(
         client_id,
-        authority=f"https://login.microsoftonline.com/{tenant_id}",
-        client_credential=client_secret,
+        authority="https://login.microsoftonline.com/common",
+        token_cache=cache,
     )
-    r = _msal_app.acquire_token_for_client(
-        scopes=["https://graph.microsoft.com/.default"]
-    )
-    if "access_token" not in r:
-        raise Exception(r.get("error_description", str(r)))
-    return r["access_token"]
+    return app, cache
+
+
+def _save_msal_cache(cache: msal.SerializableTokenCache) -> None:
+    if cache.has_state_changed:
+        st.session_state["_msal_cache"] = cache.serialize()
+
+
+def _get_valid_token(client_id: str) -> str:
+    """Obtém token delegado da cache. Lança exceção se não autenticado."""
+    app, cache = _get_msal_app(client_id)
+    accounts = app.get_accounts()
+    if not accounts:
+        raise Exception(
+            "Não autenticado. Clique em '🔑 Conectar Microsoft' nas Configurações."
+        )
+    result = app.acquire_token_silent(_GRAPH_SCOPES, account=accounts[0])
+    _save_msal_cache(cache)
+    if result and "access_token" in result:
+        return result["access_token"]
+    raise Exception("Sessão expirada. Faça login novamente nas Configurações.")
 
 
 def _resolve_excel_ids(token: str, sharing_url: str) -> tuple:
@@ -443,10 +468,10 @@ def nome_aba_atual() -> str:
 
 def inserir_linhas_excel(
     linhas: list,
-    tenant_id: str, client_id: str, client_secret: str, sharing_url: str,
+    client_id: str, sharing_url: str,
 ) -> int:
     """Insere linhas de contratos no Excel Online via Microsoft Graph API."""
-    token             = _graph_token(tenant_id, client_id, client_secret)
+    token             = _get_valid_token(client_id)
     drive_id, item_id = _resolve_excel_ids(token, sharing_url)
     aba               = nome_aba_atual()
     ws_id             = _get_ws_id(token, drive_id, item_id, aba)
@@ -470,10 +495,10 @@ def inserir_linhas_excel(
 
 def inserir_e_colorir_excel(
     itens: list,
-    tenant_id: str, client_id: str, client_secret: str, sharing_url: str,
+    client_id: str, sharing_url: str,
 ) -> int:
     """Insere linhas avulsas no Excel Online e pinta cada linha pela categoria."""
-    token             = _graph_token(tenant_id, client_id, client_secret)
+    token             = _get_valid_token(client_id)
     drive_id, item_id = _resolve_excel_ids(token, sharing_url)
     aba               = nome_aba_atual()
     ws_id             = _get_ws_id(token, drive_id, item_id, aba)
@@ -804,14 +829,12 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ── Configurações (popover — botão nativo, painel flutuante) ──────────────────
-_gemini_default     = os.getenv("GEMINI_API_KEY")       or st.secrets.get("GEMINI_API_KEY",       "")
-_tenant_default     = os.getenv("AZURE_TENANT_ID")      or st.secrets.get("AZURE_TENANT_ID",      "")
-_client_id_default  = os.getenv("AZURE_CLIENT_ID")      or st.secrets.get("AZURE_CLIENT_ID",      "")
-_client_sc_default  = os.getenv("AZURE_CLIENT_SECRET")  or st.secrets.get("AZURE_CLIENT_SECRET",  "")
-_excel_url_default  = os.getenv("EXCEL_SHARING_URL")    or st.secrets.get("EXCEL_SHARING_URL",    "")
+_gemini_default    = os.getenv("GEMINI_API_KEY")    or st.secrets.get("GEMINI_API_KEY",    "")
+_client_id_default = os.getenv("AZURE_CLIENT_ID")   or st.secrets.get("AZURE_CLIENT_ID",   "")
+_excel_url_default = os.getenv("EXCEL_SHARING_URL") or st.secrets.get("EXCEL_SHARING_URL", "")
 
 with st.popover("⚙️  Configurações"):
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     with col1:
         api_key = st.text_input(
             "Gemini API Key",
@@ -821,44 +844,103 @@ with st.popover("⚙️  Configurações"):
             key="cfg_api_key",
         )
     with col2:
-        az_tenant = st.text_input(
-            "Azure Tenant ID",
-            value=_tenant_default,
-            type="password",
-            help="Diretório (tenant) ID — Azure Active Directory → Visão geral",
-            key="cfg_tenant_id",
-        )
-    with col3:
         az_client_id = st.text_input(
             "Azure Client ID",
             value=_client_id_default,
             type="password",
-            help="ID do aplicativo registrado no Azure App Registration",
+            help="ID do aplicativo — Azure App Registration → Visão geral",
             key="cfg_client_id",
         )
+    excel_url = st.text_input(
+        "Link do Excel Online",
+        value=_excel_url_default,
+        help="OneDrive → clique no arquivo → Compartilhar → Copiar link",
+        key="cfg_excel_url",
+    )
 
-    col4, col5 = st.columns(2)
-    with col4:
-        az_client_secret = st.text_input(
-            "Azure Client Secret",
-            value=_client_sc_default,
-            type="password",
-            help="Certificados e segredos → Novo segredo do cliente",
-            key="cfg_client_secret",
-        )
-    with col5:
-        excel_url = st.text_input(
-            "Link do Excel Online",
-            value=_excel_url_default,
-            help="OneDrive/SharePoint → clique no arquivo → Compartilhar → Copiar link",
-            key="cfg_excel_url",
-        )
+    st.divider()
 
-    excel_ok = bool(az_tenant and az_client_id and az_client_secret and excel_url)
-    if excel_ok:
-        st.success("Excel Online configurado ✓")
-    else:
-        st.warning("Preencha as credenciais Azure e o link do Excel para habilitar a inserção.")
+    # ── Login Microsoft (device code flow) ───────────────────────────────────
+    _auth_st = st.session_state.get("_msal_auth_status", "not_auth")
+
+    if _auth_st == "not_auth":
+        _btn_login = st.button(
+            "🔑 Conectar conta Microsoft",
+            key="btn_ms_login",
+            use_container_width=True,
+            disabled=not az_client_id,
+        )
+        if _btn_login and az_client_id:
+            _app_tmp, _ = _get_msal_app(az_client_id)
+            _flow = _app_tmp.initiate_device_flow(scopes=_GRAPH_SCOPES)
+            if "user_code" not in _flow:
+                st.error(f"Erro ao iniciar login: {_flow.get('error_description', _flow)}")
+            else:
+                st.session_state["_msal_device_flow"]    = _flow
+                st.session_state["_msal_client_id_flow"] = az_client_id
+                st.session_state["_msal_auth_status"]    = "pending"
+
+                def _bg_auth(flow=_flow, cid=az_client_id):
+                    try:
+                        _a, _c = _get_msal_app(cid)
+                        r = _a.acquire_token_by_device_flow(flow)
+                        _save_msal_cache(_c)
+                        if r and "access_token" in r:
+                            st.session_state["_msal_auth_status"] = "authenticated"
+                            st.session_state["_msal_user_email"]  = (
+                                r.get("id_token_claims", {}).get("preferred_username", "")
+                            )
+                        else:
+                            st.session_state["_msal_auth_status"] = "not_auth"
+                    except Exception:
+                        st.session_state["_msal_auth_status"] = "not_auth"
+
+                threading.Thread(target=_bg_auth, daemon=True).start()
+                st.rerun()
+
+    elif _auth_st == "pending":
+        _flow = st.session_state.get("_msal_device_flow", {})
+        st.info(
+            f"**1.** Acesse: **{_flow.get('verification_uri', 'https://microsoft.com/devicelogin')}**\n\n"
+            f"**2.** Insira o código: **`{_flow.get('user_code', '...')}`**\n\n"
+            f"**3.** Faça login com sua conta Microsoft e clique abaixo"
+        )
+        col_ok, col_cancel = st.columns(2)
+        with col_ok:
+            if st.button("✅ Já fiz o login", key="btn_check_auth", use_container_width=True):
+                _cid = st.session_state.get("_msal_client_id_flow", az_client_id)
+                _app_chk, _cache_chk = _get_msal_app(_cid)
+                _accs = _app_chk.get_accounts()
+                if _accs:
+                    st.session_state["_msal_auth_status"] = "authenticated"
+                    st.session_state["_msal_user_email"]  = _accs[0].get("username", "")
+                    _save_msal_cache(_cache_chk)
+                    st.rerun()
+                else:
+                    st.warning("Login ainda não detectado. Aguarde e tente novamente.")
+        with col_cancel:
+            if st.button("↩ Cancelar", key="btn_cancel_auth", use_container_width=True):
+                st.session_state["_msal_auth_status"] = "not_auth"
+                st.rerun()
+
+    elif _auth_st == "authenticated":
+        _user_email = st.session_state.get("_msal_user_email", "")
+        st.success(f"✅ Conectado: **{_user_email}**")
+        if st.button("🚪 Desconectar", key="btn_ms_logout", use_container_width=True):
+            _app_lo, _ = _get_msal_app(az_client_id)
+            for _acc in _app_lo.get_accounts():
+                _app_lo.remove_account(_acc)
+            st.session_state["_msal_cache"]       = None
+            st.session_state["_msal_auth_status"] = "not_auth"
+            st.session_state.pop("_msal_user_email", None)
+            st.rerun()
+
+    excel_ok = (
+        bool(az_client_id and excel_url) and
+        st.session_state.get("_msal_auth_status") == "authenticated"
+    )
+    if not excel_ok and _auth_st not in ("pending", "authenticated"):
+        st.caption("💡 Preencha o Client ID, o Link do Excel e faça login para inserir dados.")
 
 # ── Upload ───────────────────────────────────────────────────────────────────
 st.markdown("""
@@ -1017,9 +1099,7 @@ if st.session_state.get("resultados"):
             if st.button(label_btn, type="primary", use_container_width=True):
                 try:
                     linhas    = [para_linha_sheets(r) for r in resultados]
-                    linha_ini = inserir_linhas_excel(
-                        linhas, az_tenant, az_client_id, az_client_secret, excel_url
-                    )
+                    linha_ini = inserir_linhas_excel(linhas, az_client_id, excel_url)
                     st.success(
                         f"✅ **{len(linhas)} linha(s)** inserida(s) com sucesso na aba "
                         f"**{aba_atual}** a partir da linha **{linha_ini}**!"
@@ -1158,9 +1238,7 @@ if st.session_state["avulso_items"]:
                 use_container_width=True,
             ):
                 try:
-                    _av_ini = inserir_e_colorir_excel(
-                        _av_items, az_tenant, az_client_id, az_client_secret, excel_url
-                    )
+                    _av_ini = inserir_e_colorir_excel(_av_items, az_client_id, excel_url)
                     st.success(
                         f"✅ **{len(_av_items)} item(ns)** inserido(s) com sucesso na aba "
                         f"**{_av_aba}** a partir da linha **{_av_ini}**!"
