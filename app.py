@@ -455,46 +455,60 @@ def _get_ws_id(token: str, drive_id: str, item_id: str, sheet_name: str) -> str:
 def _proxima_linha_excel(token: str, base_url: str) -> int:
     """Retorna a 1ª linha VAZIA após o último dado real.
 
-    Estratégia: verifica a coluna D (CPF/CNPJ, índice 3) — única coluna
-    preenchida pelo app em todos os tipos de registro (contrato e avulso)
-    e nunca preenchida por fórmulas de template da planilha.
+    Otimização: pede apenas metadados do usedRange ($select) e depois
+    só a coluna D (CPF/CNPJ) — evita baixar todo o conteúdo da planilha.
     """
-    r = requests.get(
-        f"{base_url}/usedRange",
-        headers={"Authorization": f"Bearer {token}"},
+    hdrs = {"Authorization": f"Bearer {token}"}
+
+    # ── Passo 1: metadados leves (sem values) ────────────────────────────────
+    r1 = requests.get(
+        f"{base_url}/usedRange?$select=rowIndex,rowCount,columnIndex",
+        headers=hdrs,
+        timeout=10,
     )
-    if r.status_code != 200:
+    if r1.status_code != 200:
         return 2
     try:
-        d = r.json()
+        meta = r1.json()
     except Exception:
         return 2
 
-    row_index = d.get("rowIndex", 0)    # linha de início do usedRange (base 0)
-    col_index = d.get("columnIndex", 0) # coluna de início do usedRange (base 0)
-    values    = d.get("values", [])
+    row_index = meta.get("rowIndex", 0)
+    row_count = meta.get("rowCount", 0)
 
-    if not values:
+    # Se a API ignorou o $select e devolveu values, usa direto (fallback grátis)
+    if meta.get("values"):
+        values  = meta["values"]
+        d_col   = max(3 - meta.get("columnIndex", 0), 0)
+        for i in range(len(values) - 1, -1, -1):
+            cell = values[i][d_col] if d_col < len(values[i]) else ""
+            if cell not in ("", None, 0):
+                return row_index + i + 2
         return max(row_index + 1, 2)
 
-    # Índice relativo da coluna D (abs 3) dentro do array values
-    d_col = max(3 - col_index, 0)
+    if row_count == 0:
+        return max(row_index + 1, 2)
 
-    # Varre de baixo para cima na coluna D (CPF/CNPJ)
-    last_data_idx = -1
-    for i in range(len(values) - 1, -1, -1):
-        row = values[i]
-        cell = row[d_col] if d_col < len(row) else ""
-        # CPF/CNPJ real é sempre uma string não-vazia e diferente de 0
+    last_row = row_index + row_count   # última linha do usedRange (1-based)
+
+    # ── Passo 2: somente coluna D até o limite encontrado ────────────────────
+    r2 = requests.get(
+        f"{base_url}/range(address='D1:D{last_row}')",
+        headers=hdrs,
+        timeout=10,
+    )
+    if r2.status_code != 200:
+        return last_row + 1
+    try:
+        col_vals = r2.json().get("values", [])
+    except Exception:
+        return last_row + 1
+
+    for i in range(len(col_vals) - 1, -1, -1):
+        cell = col_vals[i][0] if col_vals[i] else ""
         if cell not in ("", None, 0):
-            last_data_idx = i
-            break
-
-    if last_data_idx == -1:
-        # Nenhum CPF encontrado — planilha vazia ou só cabeçalho
-        return max(row_index + 1, 2)
-
-    return row_index + last_data_idx + 2
+            return i + 2   # 0-based → 1-based + próxima linha
+    return 2
 
 
 def nome_aba_atual() -> str:
@@ -503,11 +517,18 @@ def nome_aba_atual() -> str:
 
 
 def _excel_base(token: str, sharing_url: str, aba: str) -> tuple:
-    """Retorna (hdrs, base_url) prontos para chamar a API do workbook."""
-    drive_id, item_id = _resolve_excel_ids(token, sharing_url)
-    ws_id = _get_ws_id(token, drive_id, item_id, aba)
-    hdrs  = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    base  = (
+    """Retorna (hdrs, base_url) — cacheia drive_id/item_id/ws_id no session_state
+    para eliminar 2 chamadas HTTP em cada inserção subsequente."""
+    cache_key = f"_xl_ids_{aba}"
+    cached    = st.session_state.get(cache_key)
+    if cached:
+        drive_id, item_id, ws_id = cached
+    else:
+        drive_id, item_id = _resolve_excel_ids(token, sharing_url)
+        ws_id             = _get_ws_id(token, drive_id, item_id, aba)
+        st.session_state[cache_key] = (drive_id, item_id, ws_id)
+    hdrs = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    base = (
         f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}"
         f"/workbook/worksheets/{_url_quote(ws_id)}"
     )
@@ -544,16 +565,30 @@ def inserir_e_colorir_excel(itens: list, client_id: str, sharing_url: str) -> in
         json={"values": linhas},
     )
     r.raise_for_status()
-    for i, item in enumerate(itens):
-        cor = CORES_CATEGORIA.get(item["categoria"])
-        if not cor:
-            continue
-        row = linha_ini + i
+
+    # Aplica cores em paralelo — uma thread por linha colorida
+    def _colorir(row: int, cor: str) -> None:
         requests.patch(
             f"{base}/range(address='A{row}:AB{row}')/format/fill",
             headers=hdrs,
             json={"color": cor},
-        ).raise_for_status()
+            timeout=15,
+        )
+
+    threads = [
+        threading.Thread(
+            target=_colorir,
+            args=(linha_ini + i, CORES_CATEGORIA[item["categoria"]]),
+            daemon=True,
+        )
+        for i, item in enumerate(itens)
+        if item["categoria"] in CORES_CATEGORIA
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=15)
+
     return linha_ini
 
 
