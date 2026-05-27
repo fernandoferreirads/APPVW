@@ -1123,7 +1123,7 @@ with st.popover("⚙️  Configurações"):
     if not excel_ok and _auth_st not in ("pending", "checking", "authenticated"):
         st.caption("💡 Preencha o Client ID, o link do Excel e faça login para inserir dados.")
 
-_tab_c, _tab_d = st.tabs(["📋  Contratos", "📊  Dashboard"])
+_tab_c, _tab_d, _tab_com = st.tabs(["📋  Contratos", "📊  Dashboard", "💰  Comissão"])
 
 with _tab_c:
     st.markdown("""
@@ -1436,3 +1436,7 @@ with _tab_c:
 with _tab_d:
     from dashboard import render_dashboard as _render_dash
     _render_dash(az_client_id, dash_url)
+
+with _tab_com:
+    from comissao import render_comissao as _render_comm
+    _render_comm(az_client_id, dash_url)
