@@ -936,9 +936,10 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ── Configurações (popover) ───────────────────────────────────────────────────
-_gemini_default   = os.getenv("GEMINI_API_KEY")      or st.secrets.get("GEMINI_API_KEY",      "")
-_client_id_default = os.getenv("AZURE_CLIENT_ID")    or st.secrets.get("AZURE_CLIENT_ID",     "4c19cc34-0c80-4dcd-9d8c-f0e35c0f48b5")
-_excel_url_default = os.getenv("EXCEL_SHARING_URL")  or st.secrets.get("EXCEL_SHARING_URL",   "https://1drv.ms/x/c/34eb48bbe5babf33/IQBkkgUSG37eT7AUIIT0EnFIAawdB8KZ6Yx5ypjyblkZbdU?e=DuWAzF")
+_gemini_default    = os.getenv("GEMINI_API_KEY")       or st.secrets.get("GEMINI_API_KEY",       "")
+_client_id_default = os.getenv("AZURE_CLIENT_ID")     or st.secrets.get("AZURE_CLIENT_ID",      "4c19cc34-0c80-4dcd-9d8c-f0e35c0f48b5")
+_excel_url_default = os.getenv("EXCEL_SHARING_URL")   or st.secrets.get("EXCEL_SHARING_URL",    "https://1drv.ms/x/c/34eb48bbe5babf33/IQBkkgUSG37eT7AUIIT0EnFIAawdB8KZ6Yx5ypjyblkZbdU?e=DuWAzF")
+_dash_url_default  = os.getenv("DASH_SHARING_URL")    or st.secrets.get("DASH_SHARING_URL",     "")
 
 with st.popover("⚙️  Configurações"):
     col1, col2 = st.columns(2)
@@ -959,10 +960,16 @@ with st.popover("⚙️  Configurações"):
             key="cfg_client_id",
         )
     excel_url = st.text_input(
-        "Link do Excel Online (OneDrive)",
+        "Link do Excel — Contratos (OneDrive)",
         value=_excel_url_default,
         help="OneDrive → abrir arquivo → Compartilhar → Copiar link",
         key="cfg_excel_url",
+    )
+    dash_url = st.text_input(
+        "Link do Excel — Dashboard (OneDrive)",
+        value=_dash_url_default,
+        help="OneDrive → abrir o arquivo do Dashboard → Compartilhar → Copiar link",
+        key="cfg_dash_url",
     )
     st.divider()
 
@@ -1372,4 +1379,4 @@ with _tab_c:
 
 with _tab_d:
     from dashboard import render_dashboard as _render_dash
-    _render_dash(az_client_id, excel_url)
+    _render_dash(az_client_id, dash_url)
