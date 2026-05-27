@@ -1,22 +1,19 @@
 """
 dashboard.py — Dashboard F&I via Microsoft Graph API (OneDrive / Excel Online)
 
-Camadas:
-  Dados:         load_data() · _get_ms_token() · _get_ids() · _list_worksheets()
-                 _read_ws() · _normalize()
-  Processamento: calc_kpis() · _pct_filled() · apply_filters()
-  UI:            render_dashboard() → _render_kpis() · _render_filters()
-                                      _render_charts() · _render_table()
+Modos de visualização:
+  📊 Gráficos da Planilha  — busca e exibe os gráficos embutidos na aba (PNG via Graph API)
+  📈 Análise Interativa    — lê os dados e gera gráficos Plotly interativos
 
 A autenticação reutiliza o token Microsoft já armazenado em st.session_state
 pela tela de Configurações — nenhum login adicional necessário.
-O cache de IDs (drive_id / item_id / ws_id) compartilha o mesmo namespace
-usado pelo módulo principal, evitando chamadas redundantes ao Graph.
 """
 
 from __future__ import annotations
 
 import base64
+import concurrent.futures
+import io
 import time
 from datetime import datetime
 from urllib.parse import quote as _url_quote
@@ -123,7 +120,6 @@ def _get_ms_token(client_id: str) -> str:
 
 def _get_ids(token: str, sharing_url: str) -> tuple[str, str]:
     """Resolve sharing URL → (drive_id, item_id). Reutiliza cache do app principal."""
-    # Tenta reutilizar qualquer entrada de cache existente
     for key, val in list(st.session_state.items()):
         if key.startswith("_xl_ids_") and isinstance(val, (tuple, list)) and len(val) == 3:
             return val[0], val[1]
@@ -140,7 +136,7 @@ def _get_ids(token: str, sharing_url: str) -> tuple[str, str]:
 
 
 def _list_worksheets(token: str, sharing_url: str) -> list[str]:
-    """Retorna lista de nomes de todas as abas do arquivo Excel."""
+    """Retorna lista de nomes de todas as abas; popula cache de ws_ids."""
     drive_id, item_id = _get_ids(token, sharing_url)
     r = requests.get(
         f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}"
@@ -149,7 +145,14 @@ def _list_worksheets(token: str, sharing_url: str) -> list[str]:
         timeout=20,
     )
     r.raise_for_status()
-    return [ws["name"] for ws in r.json().get("value", [])]
+    names = []
+    for ws in r.json().get("value", []):
+        names.append(ws["name"])
+        # Aproveita para popular o cache de ws_ids enquanto temos a lista
+        cache_key = f"_xl_ids_{ws['name']}"
+        if cache_key not in st.session_state:
+            st.session_state[cache_key] = (drive_id, item_id, ws["id"])
+    return names
 
 
 def _get_ws_id(token: str, drive_id: str, item_id: str, aba: str) -> str:
@@ -185,11 +188,7 @@ def _read_ws(token: str, drive_id: str, item_id: str, ws_id: str) -> list[list]:
         f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}"
         f"/workbook/worksheets/{_url_quote(ws_id)}"
     )
-    r = requests.get(
-        f"{base}/usedRange?$select=values",
-        headers=headers,
-        timeout=30,
-    )
+    r = requests.get(f"{base}/usedRange?$select=values", headers=headers, timeout=30)
     r.raise_for_status()
     return r.json().get("values", [])
 
@@ -198,7 +197,6 @@ def load_data(client_id: str, sharing_url: str, aba: str) -> tuple[pd.DataFrame 
     """
     Carrega e normaliza os dados da aba especificada.
     Cache manual de 5 minutos em session_state (TTL por aba).
-    Retorna (df, "") em caso de sucesso ou (None, "mensagem") em caso de erro.
     """
     cache_key = f"_dash_df_{aba}"
     ts_key    = f"_dash_ts_{aba}"
@@ -209,10 +207,10 @@ def load_data(client_id: str, sharing_url: str, aba: str) -> tuple[pd.DataFrame 
         return cached_df, ""
 
     try:
-        token    = _get_ms_token(client_id)
+        token             = _get_ms_token(client_id)
         drive_id, item_id = _get_ids(token, sharing_url)
-        ws_id    = _get_ws_id(token, drive_id, item_id, aba)
-        values   = _read_ws(token, drive_id, item_id, ws_id)
+        ws_id             = _get_ws_id(token, drive_id, item_id, aba)
+        values            = _read_ws(token, drive_id, item_id, ws_id)
 
         if not values or len(values) < 2:
             return None, f"⚠️ A aba '{aba}' está vazia ou sem dados."
@@ -266,6 +264,133 @@ def _normalize(df: pd.DataFrame) -> pd.DataFrame:
         df = df[df["cliente"].notna()]
 
     return df.reset_index(drop=True)
+
+
+# ─── Gráficos da Planilha (Excel Chart Images via Graph API) ──────────────────
+
+def _list_charts(token: str, drive_id: str, item_id: str,
+                 ws_id: str, session_id: str = "") -> list[dict]:
+    """Lista todos os gráficos embutidos em uma aba."""
+    headers = {"Authorization": f"Bearer {token}"}
+    if session_id:
+        headers["workbook-session-id"] = session_id
+    r = requests.get(
+        f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}"
+        f"/workbook/worksheets/{_url_quote(ws_id)}/charts",
+        headers=headers,
+        timeout=20,
+    )
+    r.raise_for_status()
+    return r.json().get("value", [])
+
+
+def _get_chart_image(token: str, drive_id: str, item_id: str, ws_id: str,
+                     chart_id: str, session_id: str = "",
+                     width: int = 900, height: int = 520) -> str:
+    """Retorna imagem PNG do gráfico em base64 via Graph API."""
+    headers = {"Authorization": f"Bearer {token}"}
+    if session_id:
+        headers["workbook-session-id"] = session_id
+    r = requests.get(
+        f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}"
+        f"/workbook/worksheets/{_url_quote(ws_id)}/charts/{_url_quote(chart_id)}"
+        f"/image(width={width},height={height},fittingMode='Fit')",
+        headers=headers,
+        timeout=30,
+    )
+    r.raise_for_status()
+    return r.json().get("value", "")
+
+
+def _load_charts_cached(
+    token: str, drive_id: str, item_id: str,
+    ws_id: str, aba: str, session_id: str = "",
+) -> tuple[list | None, str]:
+    """
+    Busca todas as imagens de gráficos da aba com cache de 5 min.
+    Retorna ([(nome, b64_ou_None), ...], "") ou (None, "mensagem de erro").
+    As imagens são buscadas em paralelo (até 4 threads).
+    """
+    cache_key = f"_dash_charts_{aba}"
+    ts_key    = f"_dash_charts_ts_{aba}"
+
+    cached    = st.session_state.get(cache_key)
+    cached_ts = st.session_state.get(ts_key, 0)
+    if cached is not None and time.time() - cached_ts < 300:
+        return cached, ""
+
+    try:
+        charts = _list_charts(token, drive_id, item_id, ws_id, session_id)
+
+        if not charts:
+            empty: list = []
+            st.session_state[cache_key] = empty
+            st.session_state[ts_key]    = time.time()
+            return empty, ""
+
+        def _fetch(chart: dict) -> tuple[str, str | None]:
+            try:
+                img = _get_chart_image(
+                    token, drive_id, item_id, ws_id,
+                    chart["id"], session_id,
+                )
+                return chart.get("name", "Gráfico"), img
+            except Exception:
+                return chart.get("name", "Gráfico"), None
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+            result = list(ex.map(_fetch, charts))
+
+        st.session_state[cache_key] = result
+        st.session_state[ts_key]    = time.time()
+        return result, ""
+
+    except requests.HTTPError as e:
+        status = e.response.status_code if e.response is not None else 0
+        return None, f"❌ Erro HTTP {status} ao buscar gráficos da aba."
+    except Exception as e:
+        return None, f"❌ {e}"
+
+
+def _render_excel_charts(
+    token: str, drive_id: str, item_id: str,
+    ws_id: str, aba: str, session_id: str = "",
+) -> None:
+    """Exibe os gráficos embutidos na aba em grid de 2 colunas."""
+    with st.spinner(f"⏳ Carregando gráficos de **{aba}**…"):
+        results, err = _load_charts_cached(token, drive_id, item_id, ws_id, aba, session_id)
+
+    if err:
+        st.error(err)
+        return
+
+    if not results:
+        st.info("ℹ️ Nenhum gráfico encontrado nesta aba. "
+                "Verifique se a aba contém gráficos incorporados no Excel.")
+        return
+
+    ts = st.session_state.get(f"_dash_charts_ts_{aba}")
+    if ts:
+        valid = sum(1 for _, img in results if img)
+        st.caption(
+            f"{valid} de {len(results)} gráfico(s) carregado(s) · "
+            f"última atualização: {datetime.fromtimestamp(ts).strftime('%d/%m/%Y %H:%M:%S')}"
+        )
+
+    # Grid 2 colunas — exibe na ordem em que os gráficos aparecem na aba
+    cols = st.columns(2)
+    for i, (nome, img_b64) in enumerate(results):
+        with cols[i % 2]:
+            with st.container(border=True):
+                if img_b64:
+                    st.image(
+                        io.BytesIO(base64.b64decode(img_b64)),
+                        use_container_width=True,
+                    )
+                    if nome:
+                        st.caption(nome)
+                else:
+                    st.warning(f"⚠️ Não foi possível renderizar: **{nome}**")
 
 
 # ─── Camada de Processamento ──────────────────────────────────────────────────
@@ -323,7 +448,7 @@ def apply_filters(
     return result.reset_index(drop=True)
 
 
-# ─── Camada de UI ─────────────────────────────────────────────────────────────
+# ─── Camada de UI (Análise Interativa) ───────────────────────────────────────
 
 def _render_kpis(df: pd.DataFrame) -> None:
     kpis = calc_kpis(df)
@@ -367,7 +492,6 @@ def _render_filters(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _render_charts(df: pd.DataFrame) -> None:
-    # ── Linha 1 ───────────────────────────────────────────────────────────────
     l1, r1 = st.columns(2)
 
     with l1, st.container(border=True):
@@ -394,7 +518,6 @@ def _render_charts(df: pd.DataFrame) -> None:
         else:
             st.info("Sem dados de equipe.")
 
-    # ── Linha 2 ───────────────────────────────────────────────────────────────
     l2, r2 = st.columns(2)
 
     with l2, st.container(border=True):
@@ -428,7 +551,6 @@ def _render_charts(df: pd.DataFrame) -> None:
         else:
             st.info("Sem dados de data.")
 
-    # ── Linha 3 ───────────────────────────────────────────────────────────────
     l3, r3 = st.columns(2)
 
     with l3, st.container(border=True):
@@ -508,65 +630,93 @@ def render_dashboard(client_id: str = "", sharing_url: str = "") -> None:
     </div>
     """, unsafe_allow_html=True)
 
-    # Guarda autenticado
     if st.session_state.get("_msal_auth_status") != "authenticated":
         st.info("🔑 Faça login com sua conta Microsoft nas **Configurações** para visualizar o Dashboard.")
         return
 
     if not sharing_url:
-        st.info("⚙️ Configure o link do Excel (OneDrive) nas **Configurações**.")
+        st.info("⚙️ Configure o **Link do Excel — Dashboard** nas **Configurações**.")
         return
 
-    # Seleção de aba + botão atualizar
-    col_sel, col_btn = st.columns([5, 1])
+    # ── Resolve token e IDs ────────────────────────────────────────────────────
+    try:
+        token             = _get_ms_token(client_id)
+        drive_id, item_id = _get_ids(token, sharing_url)
+        ws_names          = _list_worksheets(token, sharing_url)
+    except Exception as e:
+        st.error(f"❌ Erro ao conectar ao arquivo: {e}")
+        return
 
-    with col_btn:
-        refresh = st.button("🔄 Atualizar", key="dash_refresh", use_container_width=True)
+    if not ws_names:
+        st.warning("Nenhuma aba encontrada no arquivo.")
+        return
 
-    with col_sel:
-        with st.spinner("Listando abas…"):
-            try:
-                token    = _get_ms_token(client_id)
-                ws_names = _list_worksheets(token, sharing_url)
-            except Exception as e:
-                st.error(f"❌ Erro ao conectar: {e}")
-                return
+    # ── Controles: aba | modo | atualizar ─────────────────────────────────────
+    col_aba, col_modo, col_btn = st.columns([4, 4, 1])
 
-        if not ws_names:
-            st.warning("Nenhuma aba encontrada.")
-            return
-
+    with col_aba:
         atual   = _nome_aba_atual()
         def_idx = ws_names.index(atual) if atual in ws_names else 0
-        aba     = st.selectbox("📄 Aba", ws_names, index=def_idx, key="dash_aba_sel",
-                               label_visibility="collapsed")
+        aba = st.selectbox(
+            "Aba", ws_names, index=def_idx,
+            key="dash_aba_sel", label_visibility="collapsed",
+        )
 
-    # Limpa cache da aba selecionada ao clicar em Atualizar
+    with col_modo:
+        modo = st.radio(
+            "Modo",
+            ["📊 Gráficos da Planilha", "📈 Análise Interativa"],
+            horizontal=True,
+            key="dash_modo",
+            label_visibility="collapsed",
+        )
+
+    with col_btn:
+        refresh = st.button("🔄", key="dash_refresh", use_container_width=True, help="Atualizar")
+
+    # ── Resolve ws_id da aba selecionada ──────────────────────────────────────
+    try:
+        ws_id = _get_ws_id(token, drive_id, item_id, aba)
+    except Exception as e:
+        st.error(f"❌ Erro ao acessar aba '{aba}': {e}")
+        return
+
+    session_id = st.session_state.get(f"_xl_sess_{item_id}", "")
+
+    # ── Limpa caches ao clicar em Atualizar ───────────────────────────────────
     if refresh:
-        st.session_state.pop(f"_dash_df_{aba}", None)
-        st.session_state.pop(f"_dash_ts_{aba}", None)
+        for suffix in (
+            f"_dash_df_{aba}", f"_dash_ts_{aba}",
+            f"_dash_charts_{aba}", f"_dash_charts_ts_{aba}",
+        ):
+            st.session_state.pop(suffix, None)
         st.rerun()
 
-    # Carrega dados
-    with st.spinner(f"⏳ Carregando dados da aba **{aba}**…"):
-        df, err = load_data(client_id, sharing_url, aba)
+    # ── Renderização conforme modo ────────────────────────────────────────────
+    if modo == "📊 Gráficos da Planilha":
+        _render_excel_charts(token, drive_id, item_id, ws_id, aba, session_id)
 
-    if err:
-        st.error(err)
-        return
-    if df is None or df.empty:
-        st.warning("Nenhum dado encontrado.")
-        return
+    else:  # 📈 Análise Interativa
+        with st.spinner(f"⏳ Carregando dados da aba **{aba}**…"):
+            df, err = load_data(client_id, sharing_url, aba)
 
-    # Timestamp da última atualização
-    ts = st.session_state.get(f"_dash_ts_{aba}")
-    if ts:
-        st.caption(f"Última atualização: {datetime.fromtimestamp(ts).strftime('%d/%m/%Y %H:%M:%S')} "
-                   f"· {len(df)} registros · aba **{aba}**")
+        if err:
+            st.error(err)
+            return
+        if df is None or df.empty:
+            st.warning("Nenhum dado encontrado nesta aba.")
+            return
 
-    _render_kpis(df)
-    st.divider()
-    filtered = _render_filters(df)
-    _render_charts(filtered)
-    st.divider()
-    _render_table(filtered)
+        ts = st.session_state.get(f"_dash_ts_{aba}")
+        if ts:
+            st.caption(
+                f"Última atualização: {datetime.fromtimestamp(ts).strftime('%d/%m/%Y %H:%M:%S')} "
+                f"· {len(df)} registros · aba **{aba}**"
+            )
+
+        _render_kpis(df)
+        st.divider()
+        filtered = _render_filters(df)
+        _render_charts(filtered)
+        st.divider()
+        _render_table(filtered)
