@@ -453,33 +453,47 @@ def _get_ws_id(token: str, drive_id: str, item_id: str, sheet_name: str) -> str:
 
 
 def _proxima_linha_excel(token: str, base_url: str) -> int:
-    """Retorna a 1ª linha VAZIA após o último dado real da aba."""
+    """Retorna a 1ª linha VAZIA após o último dado real.
+
+    Estratégia: verifica a coluna D (CPF/CNPJ, índice 3) — única coluna
+    preenchida pelo app em todos os tipos de registro (contrato e avulso)
+    e nunca preenchida por fórmulas de template da planilha.
+    """
     r = requests.get(
         f"{base_url}/usedRange",
         headers={"Authorization": f"Bearer {token}"},
     )
     if r.status_code != 200:
-        return 2  # fallback: linha 2 (assume linha 1 = cabeçalho)
+        return 2
     try:
         d = r.json()
     except Exception:
         return 2
 
-    row_index = d.get("rowIndex", 0)   # linha inicial do usedRange (base 0)
-    values    = d.get("values", [])    # lista de linhas com valores
+    row_index = d.get("rowIndex", 0)    # linha de início do usedRange (base 0)
+    col_index = d.get("columnIndex", 0) # coluna de início do usedRange (base 0)
+    values    = d.get("values", [])
 
-    # Varre de baixo para cima e acha a última linha com algum conteúdo real
+    if not values:
+        return max(row_index + 1, 2)
+
+    # Índice relativo da coluna D (abs 3) dentro do array values
+    d_col = max(3 - col_index, 0)
+
+    # Varre de baixo para cima na coluna D (CPF/CNPJ)
     last_data_idx = -1
     for i in range(len(values) - 1, -1, -1):
-        if any(v not in ("", None) for v in values[i]):
+        row = values[i]
+        cell = row[d_col] if d_col < len(row) else ""
+        # CPF/CNPJ real é sempre uma string não-vazia e diferente de 0
+        if cell not in ("", None, 0):
             last_data_idx = i
             break
 
     if last_data_idx == -1:
-        # usedRange inteiramente vazio — começa logo após o offset
-        return row_index + 1
+        # Nenhum CPF encontrado — planilha vazia ou só cabeçalho
+        return max(row_index + 1, 2)
 
-    # Converte para linha Excel 1-based e avança uma posição
     return row_index + last_data_idx + 2
 
 
