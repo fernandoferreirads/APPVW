@@ -390,6 +390,44 @@ CORES_CATEGORIA = {
 
 _GRAPH_SCOPES = ["https://graph.microsoft.com/Files.ReadWrite"]
 
+# ── Token persistence (mantém login entre sessões) ────────────────────────────
+_TOKEN_CACHE_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "credentials", "ms_token.json"
+)
+
+
+def _save_token_cache(access_token: str, token_exp: float,
+                      refresh_token: str, email: str = "") -> None:
+    """Persiste tokens no disco para restaurar sessão sem novo login."""
+    try:
+        os.makedirs(os.path.dirname(_TOKEN_CACHE_PATH), exist_ok=True)
+        with open(_TOKEN_CACHE_PATH, "w", encoding="utf-8") as _f:
+            json.dump({
+                "access_token":  access_token,
+                "token_exp":     token_exp,
+                "refresh_token": refresh_token,
+                "email":         email,
+            }, _f)
+    except Exception:
+        pass  # falha silenciosa — não bloqueia o app
+
+
+def _load_token_cache() -> dict | None:
+    """Carrega tokens do disco (retorna None se não existir ou inválido)."""
+    try:
+        with open(_TOKEN_CACHE_PATH, "r", encoding="utf-8") as _f:
+            return json.load(_f)
+    except Exception:
+        return None
+
+
+def _clear_token_cache() -> None:
+    """Remove o cache do disco (chamado no logout)."""
+    try:
+        os.remove(_TOKEN_CACHE_PATH)
+    except Exception:
+        pass
+
 
 # ── Auth helpers (HTTP direto — resiliente a session reset) ───────────────────
 
@@ -427,9 +465,13 @@ def _get_valid_token(client_id: str) -> str:
         )
         d = r.json()
         if "access_token" in d:
+            _new_exp     = _time.time() + d.get("expires_in", 3600)
+            _new_refresh = d.get("refresh_token", refresh)
             st.session_state["_ms_token"]         = d["access_token"]
-            st.session_state["_ms_token_exp"]     = _time.time() + d.get("expires_in", 3600)
-            st.session_state["_ms_refresh_token"] = d.get("refresh_token", refresh)
+            st.session_state["_ms_token_exp"]     = _new_exp
+            st.session_state["_ms_refresh_token"] = _new_refresh
+            _save_token_cache(d["access_token"], _new_exp, _new_refresh,
+                              st.session_state.get("_msal_user_email", ""))
             return d["access_token"]
     raise Exception("Não autenticado. Clique em '🔑 Conectar Microsoft' nas Configurações.")
 
@@ -935,6 +977,16 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+# ── Auto-restore de sessão Microsoft a partir do cache local ─────────────────
+if st.session_state.get("_msal_auth_status", "not_auth") == "not_auth":
+    _disk = _load_token_cache()
+    if _disk and _disk.get("refresh_token"):
+        st.session_state["_ms_token"]         = _disk.get("access_token", "")
+        st.session_state["_ms_token_exp"]     = _disk.get("token_exp", 0)
+        st.session_state["_ms_refresh_token"] = _disk["refresh_token"]
+        st.session_state["_msal_user_email"]  = _disk.get("email", "")
+        st.session_state["_msal_auth_status"] = "authenticated"
+
 # ── Configurações (popover) ───────────────────────────────────────────────────
 _gemini_default    = os.getenv("GEMINI_API_KEY")       or st.secrets.get("GEMINI_API_KEY",       "")
 _client_id_default = os.getenv("AZURE_CLIENT_ID")     or st.secrets.get("AZURE_CLIENT_ID",      "4c19cc34-0c80-4dcd-9d8c-f0e35c0f48b5")
@@ -1024,9 +1076,11 @@ with st.popover("⚙️  Configurações"):
             st.info("⏳ Verificando autenticação com a Microsoft…")
             _res = _poll_once(_dc, _cid_chk)
             if "access_token" in _res:
+                _tok_exp = _time.time() + _res.get("expires_in", 3600)
+                _refresh = _res.get("refresh_token", "")
                 st.session_state["_ms_token"]         = _res["access_token"]
-                st.session_state["_ms_token_exp"]     = _time.time() + _res.get("expires_in", 3600)
-                st.session_state["_ms_refresh_token"] = _res.get("refresh_token", "")
+                st.session_state["_ms_token_exp"]     = _tok_exp
+                st.session_state["_ms_refresh_token"] = _refresh
                 _email = ""
                 if "id_token" in _res:
                     try:
@@ -1037,6 +1091,7 @@ with st.popover("⚙️  Configurações"):
                         pass
                 st.session_state["_msal_user_email"]  = _email
                 st.session_state["_msal_auth_status"] = "authenticated"
+                _save_token_cache(_res["access_token"], _tok_exp, _refresh, _email)
                 st.rerun()
             elif _res.get("error") in ("authorization_pending", "slow_down"):
                 _time.sleep(_res.get("interval", 5))
@@ -1058,6 +1113,7 @@ with st.popover("⚙️  Configurações"):
                        "_msal_user_email", "_msal_device_flow", "_msal_client_id_flow"):
                 st.session_state.pop(_k, None)
             st.session_state["_msal_auth_status"] = "not_auth"
+            _clear_token_cache()
             st.rerun()
 
     excel_ok = (
