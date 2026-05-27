@@ -433,6 +433,7 @@ def _resolve_excel_ids(token: str, sharing_url: str) -> tuple:
     r = requests.get(
         f"https://graph.microsoft.com/v1.0/shares/u!{encoded}/driveItem",
         headers={"Authorization": f"Bearer {token}"},
+        timeout=20,
     )
     r.raise_for_status()
     d = r.json()
@@ -444,6 +445,7 @@ def _get_ws_id(token: str, drive_id: str, item_id: str, sheet_name: str) -> str:
         f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}"
         f"/workbook/worksheets",
         headers={"Authorization": f"Bearer {token}"},
+        timeout=20,
     )
     r.raise_for_status()
     for ws in r.json().get("value", []):
@@ -452,19 +454,66 @@ def _get_ws_id(token: str, drive_id: str, item_id: str, sheet_name: str) -> str:
     raise Exception(f"Aba '{sheet_name}' não encontrada no arquivo Excel.")
 
 
-def _proxima_linha_excel(token: str, base_url: str) -> int:
-    """Retorna a 1ª linha VAZIA após o último dado real.
+def _get_excel_ids(token: str, sharing_url: str, aba: str) -> tuple:
+    """Retorna (drive_id, item_id, base_url) — IDs cacheados no session_state."""
+    cache_key = f"_xl_ids_{aba}"
+    cached    = st.session_state.get(cache_key)
+    if cached:
+        drive_id, item_id, ws_id = cached
+    else:
+        drive_id, item_id = _resolve_excel_ids(token, sharing_url)
+        ws_id             = _get_ws_id(token, drive_id, item_id, aba)
+        st.session_state[cache_key] = (drive_id, item_id, ws_id)
+    base = (
+        f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}"
+        f"/workbook/worksheets/{_url_quote(ws_id)}"
+    )
+    return drive_id, item_id, base
 
-    Otimização: pede apenas metadados do usedRange ($select) e depois
-    só a coluna D (CPF/CNPJ) — evita baixar todo o conteúdo da planilha.
-    """
-    hdrs = {"Authorization": f"Bearer {token}"}
 
-    # ── Passo 1: metadados leves (sem values) ────────────────────────────────
+# ── Excel Sessions ────────────────────────────────────────────────────────────
+# Sem sessão: cada chamada à API abre + fecha a workbook (~10-15 s por chamada).
+# Com sessão: workbook fica carregada em memória; chamadas subsequentes <1 s.
+
+def _get_or_create_session(token: str, drive_id: str, item_id: str) -> str:
+    """Retorna ID de sessão Excel ativa (cria se não houver)."""
+    cache_key  = f"_xl_sess_{item_id}"
+    session_id = st.session_state.get(cache_key, "")
+    if session_id:
+        return session_id
+    r = requests.post(
+        f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}"
+        f"/workbook/createSession",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        json={"persistChanges": True},
+        timeout=40,
+    )
+    if r.ok:
+        session_id = r.json().get("id", "")
+        st.session_state[cache_key] = session_id
+    return session_id
+
+
+def _invalidate_session(item_id: str) -> None:
+    st.session_state.pop(f"_xl_sess_{item_id}", None)
+
+
+def _excel_hdrs(token: str, session_id: str = "") -> dict:
+    h = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    if session_id:
+        h["workbook-session-id"] = session_id
+    return h
+
+
+# ── Row detection ─────────────────────────────────────────────────────────────
+
+def _proxima_linha_excel(base_url: str, hdrs: dict) -> int:
+    """Retorna a 1ª linha VAZIA após o último dado real (coluna D = CPF/CNPJ)."""
+    # Passo 1: só metadados do usedRange (sem baixar valores)
     r1 = requests.get(
         f"{base_url}/usedRange?$select=rowIndex,rowCount,columnIndex",
         headers=hdrs,
-        timeout=10,
+        timeout=15,
     )
     if r1.status_code != 200:
         return 2
@@ -476,10 +525,10 @@ def _proxima_linha_excel(token: str, base_url: str) -> int:
     row_index = meta.get("rowIndex", 0)
     row_count = meta.get("rowCount", 0)
 
-    # Se a API ignorou o $select e devolveu values, usa direto (fallback grátis)
+    # Fallback: API ignorou $select e devolveu values → usa direto
     if meta.get("values"):
-        values  = meta["values"]
-        d_col   = max(3 - meta.get("columnIndex", 0), 0)
+        values = meta["values"]
+        d_col  = max(3 - meta.get("columnIndex", 0), 0)
         for i in range(len(values) - 1, -1, -1):
             cell = values[i][d_col] if d_col < len(values[i]) else ""
             if cell not in ("", None, 0):
@@ -489,13 +538,13 @@ def _proxima_linha_excel(token: str, base_url: str) -> int:
     if row_count == 0:
         return max(row_index + 1, 2)
 
-    last_row = row_index + row_count   # última linha do usedRange (1-based)
+    last_row = row_index + row_count
 
-    # ── Passo 2: somente coluna D até o limite encontrado ────────────────────
+    # Passo 2: apenas coluna D (CPF/CNPJ) — muito menor que usedRange completo
     r2 = requests.get(
         f"{base_url}/range(address='D1:D{last_row}')",
         headers=hdrs,
-        timeout=10,
+        timeout=15,
     )
     if r2.status_code != 200:
         return last_row + 1
@@ -507,89 +556,82 @@ def _proxima_linha_excel(token: str, base_url: str) -> int:
     for i in range(len(col_vals) - 1, -1, -1):
         cell = col_vals[i][0] if col_vals[i] else ""
         if cell not in ("", None, 0):
-            return i + 2   # 0-based → 1-based + próxima linha
+            return i + 2
     return 2
 
+
+# ── Helpers comuns de inserção ────────────────────────────────────────────────
 
 def nome_aba_atual() -> str:
     now = datetime.now()
     return f"{MESES_PT[now.month]} {now.year}"
 
 
-def _excel_base(token: str, sharing_url: str, aba: str) -> tuple:
-    """Retorna (hdrs, base_url) — cacheia drive_id/item_id/ws_id no session_state
-    para eliminar 2 chamadas HTTP em cada inserção subsequente."""
-    cache_key = f"_xl_ids_{aba}"
-    cached    = st.session_state.get(cache_key)
-    if cached:
-        drive_id, item_id, ws_id = cached
-    else:
-        drive_id, item_id = _resolve_excel_ids(token, sharing_url)
-        ws_id             = _get_ws_id(token, drive_id, item_id, aba)
-        st.session_state[cache_key] = (drive_id, item_id, ws_id)
-    hdrs = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    base = (
-        f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}"
-        f"/workbook/worksheets/{_url_quote(ws_id)}"
+def _fazer_insercao(
+    base_url: str,
+    hdrs: dict,
+    linhas: list,
+    token: str,
+    item_id: str,
+    colorir_map: dict | None = None,
+) -> int:
+    """Executa a inserção e, opcionalmente, a coloração em paralelo.
+    Em caso de erro de sessão expirada, invalida e repropaga."""
+    linha_ini = _proxima_linha_excel(base_url, hdrs)
+    n         = len(linhas)
+    address   = f"A{linha_ini}:AB{linha_ini + n - 1}"
+    r = requests.patch(
+        f"{base_url}/range(address='{address}')",
+        headers=hdrs,
+        json={"values": linhas},
+        timeout=30,
     )
-    return hdrs, base
+    if r.status_code in (404, 410, 400):
+        _invalidate_session(item_id)
+    r.raise_for_status()
+
+    if colorir_map:
+        def _colorir(row: int, cor: str) -> None:
+            requests.patch(
+                f"{base_url}/range(address='A{row}:AB{row}')/format/fill",
+                headers=hdrs,
+                json={"color": cor},
+                timeout=15,
+            )
+        threads = [
+            threading.Thread(target=_colorir, args=(linha_ini + i, cor), daemon=True)
+            for i, cor in colorir_map.items()
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=20)
+
+    return linha_ini
 
 
 def inserir_linhas_excel(linhas: list, client_id: str, sharing_url: str) -> int:
-    token = _get_valid_token(client_id)
-    aba   = nome_aba_atual()
-    hdrs, base = _excel_base(token, sharing_url, aba)
-    linha_ini  = _proxima_linha_excel(token, base)
-    n          = len(linhas)
-    address    = f"A{linha_ini}:AB{linha_ini + n - 1}"
-    r = requests.patch(
-        f"{base}/range(address='{address}')",
-        headers=hdrs,
-        json={"values": linhas},
-    )
-    r.raise_for_status()
-    return linha_ini
+    token                    = _get_valid_token(client_id)
+    aba                      = nome_aba_atual()
+    drive_id, item_id, base  = _get_excel_ids(token, sharing_url, aba)
+    session_id               = _get_or_create_session(token, drive_id, item_id)
+    hdrs                     = _excel_hdrs(token, session_id)
+    return _fazer_insercao(base, hdrs, linhas, token, item_id)
 
 
 def inserir_e_colorir_excel(itens: list, client_id: str, sharing_url: str) -> int:
-    token = _get_valid_token(client_id)
-    aba   = nome_aba_atual()
-    hdrs, base = _excel_base(token, sharing_url, aba)
-    linha_ini  = _proxima_linha_excel(token, base)
-    linhas     = [produto_para_linha_avulso(it) for it in itens]
-    n          = len(linhas)
-    address    = f"A{linha_ini}:AB{linha_ini + n - 1}"
-    r = requests.patch(
-        f"{base}/range(address='{address}')",
-        headers=hdrs,
-        json={"values": linhas},
-    )
-    r.raise_for_status()
-
-    # Aplica cores em paralelo — uma thread por linha colorida
-    def _colorir(row: int, cor: str) -> None:
-        requests.patch(
-            f"{base}/range(address='A{row}:AB{row}')/format/fill",
-            headers=hdrs,
-            json={"color": cor},
-            timeout=15,
-        )
-
-    threads = [
-        threading.Thread(
-            target=_colorir,
-            args=(linha_ini + i, CORES_CATEGORIA[item["categoria"]]),
-            daemon=True,
-        )
-        for i, item in enumerate(itens)
-        if item["categoria"] in CORES_CATEGORIA
-    ]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join(timeout=15)
-
-    return linha_ini
+    token                    = _get_valid_token(client_id)
+    aba                      = nome_aba_atual()
+    drive_id, item_id, base  = _get_excel_ids(token, sharing_url, aba)
+    session_id               = _get_or_create_session(token, drive_id, item_id)
+    hdrs                     = _excel_hdrs(token, session_id)
+    linhas                   = [produto_para_linha_avulso(it) for it in itens]
+    colorir_map              = {
+        i: CORES_CATEGORIA[it["categoria"]]
+        for i, it in enumerate(itens)
+        if it["categoria"] in CORES_CATEGORIA
+    }
+    return _fazer_insercao(base, hdrs, linhas, token, item_id, colorir_map)
 
 
 # ─── Interface ─────────────────────────────────────────────────────────────────
