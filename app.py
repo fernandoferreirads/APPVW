@@ -1209,8 +1209,9 @@ if st.session_state.get("resultados"):
         else:
             if st.button(label_btn, type="primary", use_container_width=True):
                 try:
-                    linhas    = [para_linha_sheets(r) for r in resultados]
-                    linha_ini = inserir_linhas_excel(linhas, az_client_id, excel_url)
+                    linhas = [para_linha_sheets(r) for r in resultados]
+                    with st.spinner(f"⏳ Inserindo {len(linhas)} linha(s) na planilha…"):
+                        linha_ini = inserir_linhas_excel(linhas, az_client_id, excel_url)
                     st.success(
                         f"✅ **{len(linhas)} linha(s)** inserida(s) com sucesso na aba "
                         f"**{aba_atual}** a partir da linha **{linha_ini}**!"
@@ -1349,7 +1350,8 @@ if st.session_state["avulso_items"]:
                 use_container_width=True,
             ):
                 try:
-                    _av_ini = inserir_e_colorir_excel(_av_items, az_client_id, excel_url)
+                    with st.spinner(f"⏳ Inserindo {len(_av_items)} item(ns) na planilha…"):
+                        _av_ini = inserir_e_colorir_excel(_av_items, az_client_id, excel_url)
                     st.success(
                         f"✅ **{len(_av_items)} item(ns)** inserido(s) com sucesso na aba "
                         f"**{_av_aba}** a partir da linha **{_av_ini}**!"
