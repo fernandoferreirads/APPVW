@@ -964,6 +964,12 @@ with st.popover("⚙️  Configurações"):
         help="OneDrive → abrir arquivo → Compartilhar → Copiar link",
         key="cfg_excel_url",
     )
+    gdrive_dash_url = st.text_input(
+        "Link do Dashboard (Google Drive)",
+        value=os.getenv("GDRIVE_DASH_URL") or st.secrets.get("GDRIVE_DASH_URL", ""),
+        help="Google Drive → Compartilhar → Copiar link (arquivo deve ser público)",
+        key="cfg_gdrive_url",
+    )
 
     st.divider()
 
@@ -1061,310 +1067,316 @@ with st.popover("⚙️  Configurações"):
     if not excel_ok and _auth_st not in ("pending", "checking", "authenticated"):
         st.caption("💡 Preencha o Client ID, o link do Excel e faça login para inserir dados.")
 
-# ── Upload ───────────────────────────────────────────────────────────────────
-st.markdown("""
-<div class="section-title">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-         stroke="#001e50" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-        <polyline points="17 8 12 3 7 8"/>
-        <line x1="12" y1="3" x2="12" y2="15"/>
-    </svg>
-    <span>Envio de Contratos</span>
-</div>
-""", unsafe_allow_html=True)
+_tab_c, _tab_d = st.tabs(["📋  Contratos", "📊  Dashboard"])
 
-arquivos = st.file_uploader(
-    "Arraste os PDFs dos contratos aqui",
-    type="pdf",
-    accept_multiple_files=True,
-    label_visibility="collapsed",
-)
+with _tab_c:
+    st.markdown("""
+    <div class="section-title">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+             stroke="#001e50" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <span>Envio de Contratos</span>
+    </div>
+    """, unsafe_allow_html=True)
 
-if arquivos:
-    n = len(arquivos)
-    st.info(f"**{n} arquivo(s) carregado(s).** Clique em Processar para extrair as informações.")
+    arquivos = st.file_uploader(
+        "Arraste os PDFs dos contratos aqui",
+        type="pdf",
+        accept_multiple_files=True,
+        label_visibility="collapsed",
+    )
 
-    col_btn, _ = st.columns([1, 3])
-    with col_btn:
-        processar = st.button("🔍 Processar Contratos", type="primary", use_container_width=True)
+    if arquivos:
+        n = len(arquivos)
+        st.info(f"**{n} arquivo(s) carregado(s).** Clique em Processar para extrair as informações.")
 
-    if processar:
-        if not api_key:
-            st.error("Informe a Gemini API Key nas configurações.")
-            st.stop()
+        col_btn, _ = st.columns([1, 3])
+        with col_btn:
+            processar = st.button("🔍 Processar Contratos", type="primary", use_container_width=True)
 
-        resultados = []
-        erros      = []
-        data_hoje  = datetime.now().strftime("%d/%m/%Y")
+        if processar:
+            if not api_key:
+                st.error("Informe a Gemini API Key nas configurações.")
+                st.stop()
 
-        # Barra de progresso geral (avança a cada arquivo concluído)
-        barra = st.progress(0, text="Iniciando extração...")
+            resultados = []
+            erros      = []
+            data_hoje  = datetime.now().strftime("%d/%m/%Y")
 
-        # st.status: spinner CSS animado pelo cliente — não depende de updates do servidor
-        with st.status("⏳ Processando contratos via Gemini AI…", expanded=True) as _status:
-            for i, arq in enumerate(arquivos):
-                barra.progress(i / n, text=f"Contrato {i + 1}/{n}: **{arq.name}**")
-                st.write(f"🔍 Lendo: **{arq.name}**")
+            # Barra de progresso geral (avança a cada arquivo concluído)
+            barra = st.progress(0, text="Iniciando extração...")
 
-                # Thread separada para a chamada à API
-                _slot = {"raw": None, "err": None}
-                _pdf  = arq.read()
+            # st.status: spinner CSS animado pelo cliente — não depende de updates do servidor
+            with st.status("⏳ Processando contratos via Gemini AI…", expanded=True) as _status:
+                for i, arq in enumerate(arquivos):
+                    barra.progress(i / n, text=f"Contrato {i + 1}/{n}: **{arq.name}**")
+                    st.write(f"🔍 Lendo: **{arq.name}**")
 
-                def _worker(pdf=_pdf, slot=_slot):
-                    try:
-                        slot["raw"] = extrair_contrato(pdf, api_key)
-                    except Exception as exc:
-                        slot["err"] = str(exc)
+                    # Thread separada para a chamada à API
+                    _slot = {"raw": None, "err": None}
+                    _pdf  = arq.read()
 
-                _t = threading.Thread(target=_worker, daemon=True)
-                _t.start()
+                    def _worker(pdf=_pdf, slot=_slot):
+                        try:
+                            slot["raw"] = extrair_contrato(pdf, api_key)
+                        except Exception as exc:
+                            slot["err"] = str(exc)
 
-                # Animação da barra enquanto aguarda
-                _p     = i / n
-                _teto  = (i / n) + (1 / n) * 0.90
-                _passo = (1 / n) * 0.90 / 60   # ~30 s para cobrir 90 % do segmento
-                while _t.is_alive():
-                    _p = min(_p + _passo, _teto)
-                    barra.progress(_p, text=f"⏳ Gemini AI analisando: **{arq.name}**")
-                    _time.sleep(0.5)
+                    _t = threading.Thread(target=_worker, daemon=True)
+                    _t.start()
 
-                _t.join()
+                    # Animação da barra enquanto aguarda
+                    _p     = i / n
+                    _teto  = (i / n) + (1 / n) * 0.90
+                    _passo = (1 / n) * 0.90 / 60   # ~30 s para cobrir 90 % do segmento
+                    while _t.is_alive():
+                        _p = min(_p + _passo, _teto)
+                        barra.progress(_p, text=f"⏳ Gemini AI analisando: **{arq.name}**")
+                        _time.sleep(0.5)
 
-                if _slot["err"]:
-                    erros.append({"arquivo": arq.name, "erro": _slot["err"]})
-                    st.write(f"❌ Erro: **{arq.name}**")
+                    _t.join()
+
+                    if _slot["err"]:
+                        erros.append({"arquivo": arq.name, "erro": _slot["err"]})
+                        st.write(f"❌ Erro: **{arq.name}**")
+                    else:
+                        try:
+                            processado = aplicar_regras(_slot["raw"], data_hoje)
+                            processado["_arquivo"] = arq.name
+                            resultados.append(processado)
+                            st.write(f"✅ Concluído: **{arq.name}**")
+                        except Exception as exc:
+                            erros.append({"arquivo": arq.name, "erro": str(exc)})
+                            st.write(f"❌ Erro ao processar: **{arq.name}**")
+
+                    barra.progress((i + 1) / n, text=f"✅ {i + 1}/{n} concluído(s)")
+
+                barra.progress(1.0, text="✅ Processamento concluído!")
+
+                if erros:
+                    _status.update(label=f"⚠️ Concluído com {len(erros)} erro(s)", state="error")
                 else:
-                    try:
-                        processado = aplicar_regras(_slot["raw"], data_hoje)
-                        processado["_arquivo"] = arq.name
-                        resultados.append(processado)
-                        st.write(f"✅ Concluído: **{arq.name}**")
-                    except Exception as exc:
-                        erros.append({"arquivo": arq.name, "erro": str(exc)})
-                        st.write(f"❌ Erro ao processar: **{arq.name}**")
+                    _status.update(
+                        label=f"✅ {len(resultados)} contrato(s) extraído(s) com sucesso!",
+                        state="complete",
+                    )
 
-                barra.progress((i + 1) / n, text=f"✅ {i + 1}/{n} concluído(s)")
+            for erro in erros:
+                st.error(f"❌ Erro em **{erro['arquivo']}**: {erro['erro']}")
 
-            barra.progress(1.0, text="✅ Processamento concluído!")
+            if resultados:
+                st.session_state["resultados"] = resultados
+                st.rerun()
 
-            if erros:
-                _status.update(label=f"⚠️ Concluído com {len(erros)} erro(s)", state="error")
+    # ── Prévia e Inserção ────────────────────────────────────────────────────────
+    if st.session_state.get("resultados"):
+        resultados = st.session_state["resultados"]
+
+        st.success(f"✅ **{len(resultados)} contrato(s) extraído(s)** — revise os dados abaixo antes de inserir.")
+        st.subheader("📋 Prévia dos Dados")
+
+        df = pd.DataFrame([
+            {
+                "Arquivo":        r.get("_arquivo", ""),
+                "Proposta":       r["proposta"],
+                "Cliente":        r["cliente"],
+                "CPF/CNPJ":       r["cpf_cnpj"],
+                "Vendedor":       r["vendedor"],
+                "Equipe":         r["equipe"],
+                "Vr. Veículo":    f"R$ {r['valor_veiculo']:,.2f}",
+                "Entrada":        f"R$ {r['entrada']:,.2f}",
+                "Vr. Financiado": f"R$ {r['valor_financiado']:,.2f}",
+                "SPF":            r["spf"],
+                "APP":            r["app"],
+                "GAP":            r["gap"],
+                "Franquia":       r["franquia"],
+                "GE":             r["ge"],
+                "Protege":        r["protege"],
+                "Prazo":          r["prazo"],
+                "Taxa":           r["taxa"],
+                "N/S":            r["tipo_veiculo"],
+                "Sempre Novo":    r["sempre_novo"],
+                "Peso":           r["peso_tabela"],
+                "Retorno":        f"R$ {r['retorno']:,.2f}",
+                "Pontos":         r["pontos"],
+            }
+            for r in resultados
+        ])
+
+        st.dataframe(df, use_container_width=True, hide_index=True)
+
+        st.divider()
+        col_ins, col_lim = st.columns([4, 1])
+
+        with col_lim:
+            if st.button("🗑️ Limpar", use_container_width=True):
+                del st.session_state["resultados"]
+                st.rerun()
+
+        with col_ins:
+            aba_atual = nome_aba_atual()
+            label_btn = f"✅ Inserir {len(resultados)} linha(s) na planilha → aba {aba_atual}"
+
+            if not excel_ok:
+                st.warning("Faça login com sua conta Microsoft nas Configurações para habilitar a inserção.")
             else:
-                _status.update(
-                    label=f"✅ {len(resultados)} contrato(s) extraído(s) com sucesso!",
-                    state="complete",
-                )
+                if st.button(label_btn, type="primary", use_container_width=True):
+                    try:
+                        linhas = [para_linha_sheets(r) for r in resultados]
+                        with st.spinner(f"⏳ Inserindo {len(linhas)} linha(s) na planilha…"):
+                            linha_ini = inserir_linhas_excel(linhas, az_client_id, excel_url)
+                        st.success(
+                            f"✅ **{len(linhas)} linha(s)** inserida(s) com sucesso na aba "
+                            f"**{aba_atual}** a partir da linha **{linha_ini}**!"
+                        )
+                        del st.session_state["resultados"]
+                        st.balloons()
+                    except Exception as e:
+                        st.error(f"❌ Erro ao inserir no Excel: {e}")
 
-        for erro in erros:
-            st.error(f"❌ Erro em **{erro['arquivo']}**: {erro['erro']}")
+    # ── Cadastro Avulso ───────────────────────────────────────────────────────────
+    st.markdown(
+        '<hr style="border:none;border-top:2px solid #eaecf4;margin:2.5rem 0 1.5rem 0;">',
+        unsafe_allow_html=True,
+    )
 
-        if resultados:
-            st.session_state["resultados"] = resultados
-            st.rerun()
+    st.markdown("""
+    <div class="section-title">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+             stroke="#001e50" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20h9"/>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+        </svg>
+        <span>Cadastro Avulso</span>
+    </div>
+    <p style="color:#6b7280;font-size:0.875rem;margin:-0.5rem 0 1.25rem 32px;">
+        Garantias &nbsp;·&nbsp; Seguros &nbsp;·&nbsp; VW Protege &mdash; produtos inseridos fora do financiamento
+    </p>
+    """, unsafe_allow_html=True)
 
-# ── Prévia e Inserção ────────────────────────────────────────────────────────
-if st.session_state.get("resultados"):
-    resultados = st.session_state["resultados"]
+    if "avulso_items" not in st.session_state:
+        st.session_state["avulso_items"] = []
 
-    st.success(f"✅ **{len(resultados)} contrato(s) extraído(s)** — revise os dados abaixo antes de inserir.")
-    st.subheader("📋 Prévia dos Dados")
+    # Formulário de entrada
+    with st.container(border=True):
+        # Linha 1 — Nome e CPF
+        col_av_nome, col_av_cpf = st.columns(2)
+        with col_av_nome:
+            av_nome = st.text_input(
+                "Nome do Cliente",
+                key="av_nome",
+                placeholder="Ex: JOÃO SILVA SANTOS",
+            )
+        with col_av_cpf:
+            av_cpf = st.text_input(
+                "CPF",
+                key="av_cpf",
+                placeholder="000.000.000-00",
+            )
 
-    df = pd.DataFrame([
-        {
-            "Arquivo":        r.get("_arquivo", ""),
-            "Proposta":       r["proposta"],
-            "Cliente":        r["cliente"],
-            "CPF/CNPJ":       r["cpf_cnpj"],
-            "Vendedor":       r["vendedor"],
-            "Equipe":         r["equipe"],
-            "Vr. Veículo":    f"R$ {r['valor_veiculo']:,.2f}",
-            "Entrada":        f"R$ {r['entrada']:,.2f}",
-            "Vr. Financiado": f"R$ {r['valor_financiado']:,.2f}",
-            "SPF":            r["spf"],
-            "APP":            r["app"],
-            "GAP":            r["gap"],
-            "Franquia":       r["franquia"],
-            "GE":             r["ge"],
-            "Protege":        r["protege"],
-            "Prazo":          r["prazo"],
-            "Taxa":           r["taxa"],
-            "N/S":            r["tipo_veiculo"],
-            "Sempre Novo":    r["sempre_novo"],
-            "Peso":           r["peso_tabela"],
-            "Retorno":        f"R$ {r['retorno']:,.2f}",
-            "Pontos":         r["pontos"],
-        }
-        for r in resultados
-    ])
+        # Linha 2 — Vendedor | Categoria | Produto (cascata)
+        col_av_vend, col_av_cat, col_av_prod = st.columns(3)
+        with col_av_vend:
+            av_vendedor = st.selectbox(
+                "Vendedor",
+                options=sorted(VENDEDOR_EQUIPE.keys()),
+                key="av_vendedor",
+            )
+            _av_equipe = lookup_vendedor(av_vendedor)
+            st.caption(f"🏢 Equipe: **{_av_equipe}**")
 
-    st.dataframe(df, use_container_width=True, hide_index=True)
+        with col_av_cat:
+            av_cat = st.selectbox(
+                "Categoria",
+                options=list(PRODUTOS_AVULSO.keys()),
+                key="av_categoria",
+            )
 
-    st.divider()
-    col_ins, col_lim = st.columns([4, 1])
+        with col_av_prod:
+            # Chave dinâmica garante reset ao trocar de categoria
+            av_prod = st.selectbox(
+                "Produto",
+                options=PRODUTOS_AVULSO[av_cat],
+                key=f"av_produto_{av_cat}",
+            )
+            _av_pts = PONTOS_AVULSO.get(av_prod, 0)
+            st.caption(f"⭐ Pontos: **{_av_pts}**")
 
-    with col_lim:
-        if st.button("🗑️ Limpar", use_container_width=True):
-            del st.session_state["resultados"]
-            st.rerun()
+        # Botão Adicionar
+        col_av_add, _col_sp = st.columns([1, 4])
+        with col_av_add:
+            av_add = st.button("➕ Adicionar à lista", key="av_add", use_container_width=True)
 
-    with col_ins:
-        aba_atual = nome_aba_atual()
-        label_btn = f"✅ Inserir {len(resultados)} linha(s) na planilha → aba {aba_atual}"
-
-        if not excel_ok:
-            st.warning("Faça login com sua conta Microsoft nas Configurações para habilitar a inserção.")
+    if av_add:
+        if not av_nome.strip():
+            st.warning("⚠️ Informe o nome do cliente.")
+        elif not av_cpf.strip():
+            st.warning("⚠️ Informe o CPF.")
         else:
-            if st.button(label_btn, type="primary", use_container_width=True):
-                try:
-                    linhas = [para_linha_sheets(r) for r in resultados]
-                    with st.spinner(f"⏳ Inserindo {len(linhas)} linha(s) na planilha…"):
-                        linha_ini = inserir_linhas_excel(linhas, az_client_id, excel_url)
-                    st.success(
-                        f"✅ **{len(linhas)} linha(s)** inserida(s) com sucesso na aba "
-                        f"**{aba_atual}** a partir da linha **{linha_ini}**!"
-                    )
-                    del st.session_state["resultados"]
-                    st.balloons()
-                except Exception as e:
-                    st.error(f"❌ Erro ao inserir no Excel: {e}")
-
-# ── Cadastro Avulso ───────────────────────────────────────────────────────────
-st.markdown(
-    '<hr style="border:none;border-top:2px solid #eaecf4;margin:2.5rem 0 1.5rem 0;">',
-    unsafe_allow_html=True,
-)
-
-st.markdown("""
-<div class="section-title">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-         stroke="#001e50" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 20h9"/>
-        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-    </svg>
-    <span>Cadastro Avulso</span>
-</div>
-<p style="color:#6b7280;font-size:0.875rem;margin:-0.5rem 0 1.25rem 32px;">
-    Garantias &nbsp;·&nbsp; Seguros &nbsp;·&nbsp; VW Protege &mdash; produtos inseridos fora do financiamento
-</p>
-""", unsafe_allow_html=True)
-
-if "avulso_items" not in st.session_state:
-    st.session_state["avulso_items"] = []
-
-# Formulário de entrada
-with st.container(border=True):
-    # Linha 1 — Nome e CPF
-    col_av_nome, col_av_cpf = st.columns(2)
-    with col_av_nome:
-        av_nome = st.text_input(
-            "Nome do Cliente",
-            key="av_nome",
-            placeholder="Ex: JOÃO SILVA SANTOS",
-        )
-    with col_av_cpf:
-        av_cpf = st.text_input(
-            "CPF",
-            key="av_cpf",
-            placeholder="000.000.000-00",
-        )
-
-    # Linha 2 — Vendedor | Categoria | Produto (cascata)
-    col_av_vend, col_av_cat, col_av_prod = st.columns(3)
-    with col_av_vend:
-        av_vendedor = st.selectbox(
-            "Vendedor",
-            options=sorted(VENDEDOR_EQUIPE.keys()),
-            key="av_vendedor",
-        )
-        _av_equipe = lookup_vendedor(av_vendedor)
-        st.caption(f"🏢 Equipe: **{_av_equipe}**")
-
-    with col_av_cat:
-        av_cat = st.selectbox(
-            "Categoria",
-            options=list(PRODUTOS_AVULSO.keys()),
-            key="av_categoria",
-        )
-
-    with col_av_prod:
-        # Chave dinâmica garante reset ao trocar de categoria
-        av_prod = st.selectbox(
-            "Produto",
-            options=PRODUTOS_AVULSO[av_cat],
-            key=f"av_produto_{av_cat}",
-        )
-        _av_pts = PONTOS_AVULSO.get(av_prod, 0)
-        st.caption(f"⭐ Pontos: **{_av_pts}**")
-
-    # Botão Adicionar
-    col_av_add, _col_sp = st.columns([1, 4])
-    with col_av_add:
-        av_add = st.button("➕ Adicionar à lista", key="av_add", use_container_width=True)
-
-if av_add:
-    if not av_nome.strip():
-        st.warning("⚠️ Informe o nome do cliente.")
-    elif not av_cpf.strip():
-        st.warning("⚠️ Informe o CPF.")
-    else:
-        st.session_state["avulso_items"].append({
-            "nome":      av_nome.strip().upper(),
-            "cpf":       av_cpf.strip(),
-            "vendedor":  av_vendedor,
-            "equipe":    _av_equipe,
-            "categoria": av_cat,
-            "produto":   av_prod,
-            "pontos":    _av_pts,
-            "data":      datetime.now().strftime("%d/%m/%Y"),
-        })
-        st.rerun()
-
-# Prévia da fila e botão de inserção
-if st.session_state["avulso_items"]:
-    _av_items = st.session_state["avulso_items"]
-    st.success(f"**{len(_av_items)} item(ns)** na fila — confira abaixo antes de inserir na planilha.")
-
-    _av_df = pd.DataFrame([
-        {
-            "Nome":      it["nome"],
-            "CPF":       it["cpf"],
-            "Vendedor":  it["vendedor"],
-            "Equipe":    it["equipe"],
-            "Categoria": it["categoria"],
-            "Produto":   it["produto"],
-            "Pontos":    it["pontos"],
-        }
-        for it in _av_items
-    ])
-    st.dataframe(_av_df, use_container_width=True, hide_index=True)
-
-    col_av_ins, col_av_lim = st.columns([4, 1])
-
-    with col_av_lim:
-        if st.button("🗑️ Limpar", key="av_clear", use_container_width=True):
-            st.session_state["avulso_items"] = []
+            st.session_state["avulso_items"].append({
+                "nome":      av_nome.strip().upper(),
+                "cpf":       av_cpf.strip(),
+                "vendedor":  av_vendedor,
+                "equipe":    _av_equipe,
+                "categoria": av_cat,
+                "produto":   av_prod,
+                "pontos":    _av_pts,
+                "data":      datetime.now().strftime("%d/%m/%Y"),
+            })
             st.rerun()
 
-    with col_av_ins:
-        _av_aba = nome_aba_atual()
-        if not excel_ok:
-            st.warning("Faça login com sua conta Microsoft nas Configurações para habilitar a inserção.")
-        else:
-            if st.button(
-                f"✅ Inserir {len(_av_items)} item(ns) na planilha → aba {_av_aba}",
-                type="primary",
-                key="av_inserir",
-                use_container_width=True,
-            ):
-                try:
-                    with st.spinner(f"⏳ Inserindo {len(_av_items)} item(ns) na planilha…"):
-                        _av_ini = inserir_e_colorir_excel(_av_items, az_client_id, excel_url)
-                    st.success(
-                        f"✅ **{len(_av_items)} item(ns)** inserido(s) com sucesso na aba "
-                        f"**{_av_aba}** a partir da linha **{_av_ini}**!"
-                    )
-                    st.session_state["avulso_items"] = []
-                    st.balloons()
-                except Exception as e:
-                    st.error(f"❌ Erro ao inserir: {e}")
+    # Prévia da fila e botão de inserção
+    if st.session_state["avulso_items"]:
+        _av_items = st.session_state["avulso_items"]
+        st.success(f"**{len(_av_items)} item(ns)** na fila — confira abaixo antes de inserir na planilha.")
+
+        _av_df = pd.DataFrame([
+            {
+                "Nome":      it["nome"],
+                "CPF":       it["cpf"],
+                "Vendedor":  it["vendedor"],
+                "Equipe":    it["equipe"],
+                "Categoria": it["categoria"],
+                "Produto":   it["produto"],
+                "Pontos":    it["pontos"],
+            }
+            for it in _av_items
+        ])
+        st.dataframe(_av_df, use_container_width=True, hide_index=True)
+
+        col_av_ins, col_av_lim = st.columns([4, 1])
+
+        with col_av_lim:
+            if st.button("🗑️ Limpar", key="av_clear", use_container_width=True):
+                st.session_state["avulso_items"] = []
+                st.rerun()
+
+        with col_av_ins:
+            _av_aba = nome_aba_atual()
+            if not excel_ok:
+                st.warning("Faça login com sua conta Microsoft nas Configurações para habilitar a inserção.")
+            else:
+                if st.button(
+                    f"✅ Inserir {len(_av_items)} item(ns) na planilha → aba {_av_aba}",
+                    type="primary",
+                    key="av_inserir",
+                    use_container_width=True,
+                ):
+                    try:
+                        with st.spinner(f"⏳ Inserindo {len(_av_items)} item(ns) na planilha…"):
+                            _av_ini = inserir_e_colorir_excel(_av_items, az_client_id, excel_url)
+                        st.success(
+                            f"✅ **{len(_av_items)} item(ns)** inserido(s) com sucesso na aba "
+                            f"**{_av_aba}** a partir da linha **{_av_ini}**!"
+                        )
+                        st.session_state["avulso_items"] = []
+                        st.balloons()
+                    except Exception as e:
+                        st.error(f"❌ Erro ao inserir: {e}")
+
+with _tab_d:
+    from dashboard import render_dashboard as _render_dash
+    _render_dash(gdrive_dash_url)
