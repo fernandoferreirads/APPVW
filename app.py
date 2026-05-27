@@ -964,13 +964,6 @@ with st.popover("⚙️  Configurações"):
         help="OneDrive → abrir arquivo → Compartilhar → Copiar link",
         key="cfg_excel_url",
     )
-    gdrive_dash_url = st.text_input(
-        "Link do Dashboard (Google Drive)",
-        value=os.getenv("GDRIVE_DASH_URL") or st.secrets.get("GDRIVE_DASH_URL", ""),
-        help="Google Drive → Compartilhar → Copiar link (arquivo deve ser público)",
-        key="cfg_gdrive_url",
-    )
-
     st.divider()
 
     # ── Login Microsoft (device code flow) ───────────────────────────────────
@@ -1379,4 +1372,4 @@ with _tab_c:
 
 with _tab_d:
     from dashboard import render_dashboard as _render_dash
-    _render_dash(gdrive_dash_url)
+    _render_dash(az_client_id, excel_url)
