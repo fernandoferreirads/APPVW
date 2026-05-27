@@ -416,12 +416,15 @@ def calc_commission(df: pd.DataFrame) -> dict:
         s = pd.to_numeric(df["retorno"], errors="coerce").sum()
         total_retorno = float(s) if not pd.isna(s) else 0.0
 
+    total_comissao = sum(r["total"] for r in resultados)
+
     return {
         "por_produto":      resultados,
         "total_contratos":  len(df),
-        "total_comissao":   sum(r["total"] for r in resultados),
-        "total_retorno":    total_retorno,
-        "total_produtos":   sum(r["qtd"]   for r in resultados),
+        "total_produtos":   sum(r["qtd"] for r in resultados),
+        "total_comissao":   total_comissao,           # só produtos
+        "total_retorno":    total_retorno,             # só retorno de financiamento
+        "total_bruto":      total_comissao + total_retorno,  # produtos + retorno
     }
 
 
@@ -433,12 +436,66 @@ _PALETTE = ["#001E50","#0040B0","#00B0F0","#1EBE5D",
 
 
 def _render_kpis(summary: dict) -> None:
+    # ── Linha 1: quadro financeiro principal ──────────────────────────────────
+    st.markdown("""
+    <style>
+    .comm-card {
+        background: #f8faff;
+        border: 1.5px solid #dde3ef;
+        border-radius: 10px;
+        padding: 1.1rem 1.4rem;
+        text-align: center;
+    }
+    .comm-card .label {
+        color: #6b7280;
+        font-size: 0.78rem;
+        font-weight: 500;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+    }
+    .comm-card .value {
+        color: #001e50;
+        font-size: 1.45rem;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+    }
+    .comm-card.highlight {
+        background: linear-gradient(135deg, #001e50 0%, #0040b0 100%);
+        border-color: #001e50;
+    }
+    .comm-card.highlight .label { color: rgba(255,255,255,0.7); }
+    .comm-card.highlight .value { color: #ffffff; font-size: 1.6rem; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown(f"""
+        <div class="comm-card">
+            <div class="label">💼 Comissão de Produtos</div>
+            <div class="value">R$ {summary['total_comissao']:,.2f}</div>
+        </div>""", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"""
+        <div class="comm-card">
+            <div class="label">📈 Retorno de Financiamento</div>
+            <div class="value">R$ {summary['total_retorno']:,.2f}</div>
+        </div>""", unsafe_allow_html=True)
+    with c3:
+        st.markdown(f"""
+        <div class="comm-card highlight">
+            <div class="label">⭐ Total Bruto (Produtos + Retorno)</div>
+            <div class="value">R$ {summary['total_bruto']:,.2f}</div>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
+    # ── Linha 2: contadores operacionais ─────────────────────────────────────
     with st.container(border=True):
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("📄 Contratos",      f"{summary['total_contratos']:,}")
-        c2.metric("📦 Produtos",       f"{summary['total_produtos']:,}")
-        c3.metric("💰 Comissão Bruta", f"R$ {summary['total_comissao']:,.2f}")
-        c4.metric("📈 Retorno Total",  f"R$ {summary['total_retorno']:,.2f}")
+        cc1, cc2 = st.columns(2)
+        cc1.metric("📄 Contratos no período", f"{summary['total_contratos']:,}")
+        cc2.metric("📦 Produtos produzidos",  f"{summary['total_produtos']:,}")
 
 
 def _render_table(summary: dict) -> None:
