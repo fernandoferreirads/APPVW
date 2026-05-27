@@ -453,15 +453,34 @@ def _get_ws_id(token: str, drive_id: str, item_id: str, sheet_name: str) -> str:
 
 
 def _proxima_linha_excel(token: str, base_url: str) -> int:
+    """Retorna a 1ª linha VAZIA após o último dado real da aba."""
     r = requests.get(
         f"{base_url}/usedRange",
         headers={"Authorization": f"Bearer {token}"},
     )
+    if r.status_code != 200:
+        return 2  # fallback: linha 2 (assume linha 1 = cabeçalho)
     try:
-        rc = r.json().get("rowCount", 0) if r.status_code == 200 else 0
+        d = r.json()
     except Exception:
-        rc = 0
-    return rc + 1 if rc > 0 else 1
+        return 2
+
+    row_index = d.get("rowIndex", 0)   # linha inicial do usedRange (base 0)
+    values    = d.get("values", [])    # lista de linhas com valores
+
+    # Varre de baixo para cima e acha a última linha com algum conteúdo real
+    last_data_idx = -1
+    for i in range(len(values) - 1, -1, -1):
+        if any(v not in ("", None) for v in values[i]):
+            last_data_idx = i
+            break
+
+    if last_data_idx == -1:
+        # usedRange inteiramente vazio — começa logo após o offset
+        return row_index + 1
+
+    # Converte para linha Excel 1-based e avança uma posição
+    return row_index + last_data_idx + 2
 
 
 def nome_aba_atual() -> str:
