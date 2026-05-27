@@ -383,35 +383,47 @@ CORES_CATEGORIA = {
 _GRAPH_SCOPES = ["https://graph.microsoft.com/Files.ReadWrite"]
 
 
-# ── MSAL auth helpers ─────────────────────────────────────────────────────────
+# ── Auth helpers (HTTP direto — resiliente a session reset) ───────────────────
 
-def _get_msal_app(client_id: str) -> tuple:
-    cache = msal.SerializableTokenCache()
-    if st.session_state.get("_msal_cache"):
-        cache.deserialize(st.session_state["_msal_cache"])
-    app = msal.PublicClientApplication(
-        client_id,
-        authority="https://login.microsoftonline.com/common",
-        token_cache=cache,
+def _poll_once(device_code: str, client_id: str) -> dict:
+    """Uma única chamada ao endpoint de token — sem bloquear nem usar thread."""
+    r = requests.post(
+        "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        data={
+            "grant_type":  "urn:ietf:params:oauth:grant-type:device_code",
+            "client_id":   client_id,
+            "device_code": device_code,
+        },
+        timeout=10,
     )
-    return app, cache
-
-
-def _save_msal_cache(cache: msal.SerializableTokenCache) -> None:
-    if cache.has_state_changed:
-        st.session_state["_msal_cache"] = cache.serialize()
+    return r.json()
 
 
 def _get_valid_token(client_id: str) -> str:
-    app, cache = _get_msal_app(client_id)
-    accounts = app.get_accounts()
-    if not accounts:
-        raise Exception("Não autenticado. Clique em '🔑 Conectar Microsoft' nas Configurações.")
-    result = app.acquire_token_silent(_GRAPH_SCOPES, account=accounts[0])
-    _save_msal_cache(cache)
-    if result and "access_token" in result:
-        return result["access_token"]
-    raise Exception("Sessão expirada. Faça login novamente nas Configurações.")
+    """Retorna access token válido; renova via refresh_token se necessário."""
+    token = st.session_state.get("_ms_token")
+    exp   = st.session_state.get("_ms_token_exp", 0)
+    if token and _time.time() < exp - 60:
+        return token
+    refresh = st.session_state.get("_ms_refresh_token")
+    if refresh:
+        r = requests.post(
+            "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+            data={
+                "grant_type":    "refresh_token",
+                "client_id":     client_id,
+                "refresh_token": refresh,
+                "scope":         " ".join(_GRAPH_SCOPES),
+            },
+            timeout=15,
+        )
+        d = r.json()
+        if "access_token" in d:
+            st.session_state["_ms_token"]         = d["access_token"]
+            st.session_state["_ms_token_exp"]     = _time.time() + d.get("expires_in", 3600)
+            st.session_state["_ms_refresh_token"] = d.get("refresh_token", refresh)
+            return d["access_token"]
+    raise Exception("Não autenticado. Clique em '🔑 Conectar Microsoft' nas Configurações.")
 
 
 # ── Graph API helpers ─────────────────────────────────────────────────────────
@@ -843,7 +855,10 @@ with st.popover("⚙️  Configurações"):
     if _auth_st == "not_auth":
         if st.button("🔑 Conectar conta Microsoft", key="btn_ms_login",
                      use_container_width=True, disabled=not az_client_id):
-            _app_tmp, _ = _get_msal_app(az_client_id)
+            _app_tmp = msal.PublicClientApplication(
+                az_client_id,
+                authority="https://login.microsoftonline.com/common",
+            )
             _flow = _app_tmp.initiate_device_flow(scopes=_GRAPH_SCOPES)
             if "user_code" not in _flow:
                 st.error(f"Erro ao iniciar login: {_flow.get('error_description', _flow)}")
@@ -852,29 +867,6 @@ with st.popover("⚙️  Configurações"):
                 st.session_state["_msal_client_id_flow"] = az_client_id
                 st.session_state["_msal_auth_status"]    = "pending"
                 st.session_state.pop("_msal_auth_error", None)
-
-                def _bg_auth(flow=_flow, cid=az_client_id):
-                    try:
-                        _a, _c = _get_msal_app(cid)
-                        r = _a.acquire_token_by_device_flow(flow)
-                        _save_msal_cache(_c)
-                        if r and "access_token" in r:
-                            st.session_state["_msal_auth_status"] = "authenticated"
-                            st.session_state["_msal_user_email"]  = (
-                                r.get("id_token_claims", {}).get("preferred_username", "")
-                            )
-                        else:
-                            _err = (r or {}).get("error_description",
-                                    (r or {}).get("error", "Resposta inválida"))
-                            st.session_state["_msal_auth_error"]  = _err
-                            st.session_state["_msal_auth_status"] = "not_auth"
-                    except Exception as _exc:
-                        st.session_state["_msal_auth_error"]  = str(_exc)
-                        st.session_state["_msal_auth_status"] = "not_auth"
-
-                _bg_t = threading.Thread(target=_bg_auth, daemon=True)
-                _bg_t.start()
-                st.session_state["_msal_bg_thread"] = _bg_t
                 st.rerun()
 
     elif _auth_st == "pending":
@@ -896,23 +888,37 @@ with st.popover("⚙️  Configurações"):
                 st.rerun()
 
     elif _auth_st == "checking":
-        _bg_t  = st.session_state.get("_msal_bg_thread")
-        _alive = _bg_t is not None and _bg_t.is_alive()
-        if _alive:
-            st.info("⏳ Aguardando confirmação do Microsoft…")
-            _time.sleep(3)
-            st.rerun()
+        _flow_chk = st.session_state.get("_msal_device_flow", {})
+        _cid_chk  = st.session_state.get("_msal_client_id_flow", az_client_id)
+        _dc       = _flow_chk.get("device_code", "")
+        if not _dc:
+            st.error("Sessão expirada — inicie o login novamente.")
+            if st.button("↩ Voltar", key="btn_chk_back", use_container_width=True):
+                st.session_state["_msal_auth_status"] = "not_auth"
+                st.rerun()
         else:
-            _cid = st.session_state.get("_msal_client_id_flow", az_client_id)
-            _app_chk, _cache_chk = _get_msal_app(_cid)
-            _accs = _app_chk.get_accounts()
-            if _accs:
+            st.info("⏳ Verificando autenticação com a Microsoft…")
+            _res = _poll_once(_dc, _cid_chk)
+            if "access_token" in _res:
+                st.session_state["_ms_token"]         = _res["access_token"]
+                st.session_state["_ms_token_exp"]     = _time.time() + _res.get("expires_in", 3600)
+                st.session_state["_ms_refresh_token"] = _res.get("refresh_token", "")
+                _email = ""
+                if "id_token" in _res:
+                    try:
+                        _pl  = _res["id_token"].split(".")[1]
+                        _pl += "=" * (4 - len(_pl) % 4)
+                        _email = json.loads(base64.b64decode(_pl)).get("preferred_username", "")
+                    except Exception:
+                        pass
+                st.session_state["_msal_user_email"]  = _email
                 st.session_state["_msal_auth_status"] = "authenticated"
-                st.session_state["_msal_user_email"]  = _accs[0].get("username", "")
-                _save_msal_cache(_cache_chk)
+                st.rerun()
+            elif _res.get("error") in ("authorization_pending", "slow_down"):
+                _time.sleep(_res.get("interval", 5))
                 st.rerun()
             else:
-                _err_msg = st.session_state.get("_msal_auth_error", "")
+                _err_msg = _res.get("error_description", _res.get("error", ""))
                 st.error("❌ Autenticação não concluída."
                          + (f"\n\nDetalhe: `{_err_msg}`" if _err_msg else ""))
                 if st.button("↩ Tentar novamente", key="btn_retry_auth", use_container_width=True):
@@ -924,12 +930,10 @@ with st.popover("⚙️  Configurações"):
         _user_email = st.session_state.get("_msal_user_email", "")
         st.success(f"✅ Conectado: **{_user_email}**")
         if st.button("🚪 Desconectar", key="btn_ms_logout", use_container_width=True):
-            _app_lo, _ = _get_msal_app(az_client_id)
-            for _acc in _app_lo.get_accounts():
-                _app_lo.remove_account(_acc)
-            st.session_state["_msal_cache"]       = None
+            for _k in ("_ms_token", "_ms_token_exp", "_ms_refresh_token",
+                       "_msal_user_email", "_msal_device_flow", "_msal_client_id_flow"):
+                st.session_state.pop(_k, None)
             st.session_state["_msal_auth_status"] = "not_auth"
-            st.session_state.pop("_msal_user_email", None)
             st.rerun()
 
     excel_ok = (
