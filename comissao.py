@@ -79,44 +79,74 @@ PRODUCT_COLS: dict[str, str] = {
     "protege":  "Protege",
 }
 
-# Mapeamento de cabeçalhos da BIGBASE → nomes internos
-_COL_MAP: dict[str, str] = {
-    "PROPOSTA":             "proposta",
-    "EQUIPE":               "equipe",
-    "D. PAGTO":             "data_pagto",
-    "DATA":                 "data_pagto",
-    "DATA PAGTO":           "data_pagto",
-    "CPF/CNPJ":             "cpf_cnpj",
-    "CLIENTE":              "cliente",
-    "VALOR DO VEICULO":     "valor_veiculo",
-    "VALOR VEÍCULO":        "valor_veiculo",
-    "VALOR VEICULO":        "valor_veiculo",
-    "ENTRADA":              "entrada",
-    "VALOR FINANCIADO":     "valor_financiado",
-    "SPF":                  "spf",
-    "APP":                  "app",
-    "GAP":                  "gap",
-    "FRANQ":                "franquia",
-    "FRANQUIA":             "franquia",
-    "REV PLAN":             "rev_plan",
-    "REV_PLAN":             "rev_plan",
-    "GE":                   "ge",
-    "PROTEGE":              "protege",
-    "PRAZO":                "prazo",
-    "TAXA":                 "taxa",
-    "N/S":                  "tipo_veiculo",
-    "SEMPRE NV":            "sempre_novo",
-    "SEMPRE NOVO":          "sempre_novo",
-    "PESO TABELA":          "peso_tabela",
-    "VENDEDOR":             "vendedor",
-    "RETORNO":              "retorno",
-    "RETORNO3":             "retorno",
-    "RETORNO 3":            "retorno",
-    "PONTOS POR CONTRATOS": "pontos",
-    "PONTOS":               "pontos",
-    "LOJA":                 "loja",
-    "LOJA/EQUIPE":          "loja",
-}
+# ─── Especificação de colunas do BIGBASE ──────────────────────────────────────
+# Cada entrada: (nome_interno, [headers aceitos em uppercase], posição_fallback)
+# Posições confirmadas pelo usuário:
+#   G(6)=data  M(12)=spf  N(13)=app  O(14)=gap  P(15)=franquia
+#   Q(16)=rev_plan  R(17)=ge  S(18)=protege  Y(24)=vendedor  Z(25)=retorno
+
+_BIGBASE_SPEC: list[tuple[str, list[str], int | None]] = [
+    ("proposta",         ["PROPOSTA", "N PROPOSTA", "NUM PROPOSTA"],          0),
+    ("equipe",           ["EQUIPE", "LOJA", "LOJA/EQUIPE"],                   1),
+    ("data_pagto",       ["D. PAGTO","DATA","DATA PAGTO","DT PAGTO",
+                          "D.PAGTO","DATA PAGAMENTO","DATA DE PAGAMENTO"],     6),
+    ("spf",              ["SPF","SPF/SEGURO","SEGURO PROT FINANCEIRA"],       12),
+    ("app",              ["APP","ACID PESSOAIS","ACIDENTE PESSOAL"],          13),
+    ("gap",              ["GAP"],                                             14),
+    ("franquia",         ["FRANQ","FRANQUIA","SEGURO FRANQUIA"],              15),
+    ("rev_plan",         ["REV PLAN","REV_PLAN","REVISAO","REVISÃO"],         16),
+    ("ge",               ["GE","GARANTIA","GARANTIA ESTENDIDA"],              17),
+    ("protege",          ["PROTEGE","VW PROTEGE"],                            18),
+    ("vendedor",         ["VENDEDOR","CONSULTOR","NOME VENDEDOR"],            24),
+    ("retorno",          ["RETORNO","RETORNO3","RETORNO 3","RETORNO F&I"],    25),
+    ("cliente",          ["CLIENTE","NOME CLIENTE","RAZAO SOCIAL"],          None),
+    ("cpf_cnpj",         ["CPF/CNPJ","CPF","CNPJ","DOCUMENTO"],             None),
+    ("valor_financiado", ["VALOR FINANCIADO","VL FINANCIADO"],               None),
+    ("pontos",           ["PONTOS","PONTOS POR CONTRATOS"],                  None),
+]
+
+
+def _build_bigbase_df(values: list[list]) -> pd.DataFrame:
+    """
+    Constrói DataFrame normalizado a partir dos valores brutos do BIGBASE.
+
+    Para cada coluna interna tenta, em ordem:
+      1. Localizar pelo nome do cabeçalho (case-insensitive)
+      2. Usar a posição confirmada pelo usuário como fallback
+
+    Isso garante funcionamento independente do nome real dos cabeçalhos.
+    """
+    if not values or len(values) < 2:
+        return pd.DataFrame()
+
+    headers_raw = [str(c).strip() for c in values[0]]
+    headers_up  = [h.upper() for h in headers_raw]
+
+    # Resolve índice de coluna para cada spec
+    col_index: dict[str, int | None] = {}
+    for name, aliases, fallback in _BIGBASE_SPEC:
+        idx: int | None = None
+        for alias in aliases:
+            if alias in headers_up:
+                idx = headers_up.index(alias)
+                break
+        if idx is None and fallback is not None and fallback < len(headers_up):
+            idx = fallback
+        col_index[name] = idx
+
+    # Constrói linhas usando os índices resolvidos
+    records = []
+    for row in values[1:]:
+        record: dict = {}
+        for name, idx in col_index.items():
+            if idx is not None and idx < len(row):
+                record[name] = row[idx]
+            else:
+                record[name] = None
+        records.append(record)
+
+    return pd.DataFrame(records)
+
 
 _BIGBASE_TAB  = "BIGBASE"
 _CACHE_TTL    = 300   # segundos (5 min)
@@ -251,29 +281,37 @@ def load_bigbase(client_id: str, sharing_url: str) -> tuple[pd.DataFrame | None,
         if not values or len(values) < 2:
             return None, "⚠️ A aba BIGBASE está vazia ou sem dados suficientes."
 
-        df = pd.DataFrame(values[1:], columns=[str(c).strip() for c in values[0]])
+        # Usa mapeamento por posição (com fallback por nome de cabeçalho)
+        df = _build_bigbase_df(values)
 
-        # Normaliza colunas
-        df.columns = df.columns.str.strip().str.upper()
-        df = df.rename(columns=_COL_MAP)
+        if df.empty:
+            return None, "⚠️ Não foi possível interpretar as colunas da BIGBASE."
+
         df = df.dropna(how="all")
 
         # Tipos numéricos
-        for col in ("valor_veiculo", "entrada", "valor_financiado", "retorno", "pontos", "prazo"):
+        for col in ("retorno", "pontos", "valor_financiado"):
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
 
-        # Data
+        # Data — aceita tanto serial Excel (número) quanto string DD/MM/YYYY
         if "data_pagto" in df.columns:
-            df["data_pagto"] = pd.to_datetime(df["data_pagto"], dayfirst=True, errors="coerce")
+            def _parse_date(v):
+                if v is None or (isinstance(v, float) and pd.isna(v)):
+                    return pd.NaT
+                # Excel serial number
+                if isinstance(v, (int, float)):
+                    try:
+                        return pd.Timestamp("1899-12-30") + pd.Timedelta(days=int(v))
+                    except Exception:
+                        return pd.NaT
+                return pd.to_datetime(str(v), dayfirst=True, errors="coerce")
 
-        # Remove linhas sem proposta E sem cliente
-        has_p = "proposta" in df.columns
-        has_c = "cliente"  in df.columns
-        if has_p and has_c:
-            df = df[~(df["proposta"].isna() & df["cliente"].isna())]
-        elif has_p:
-            df = df[df["proposta"].notna()]
+            df["data_pagto"] = df["data_pagto"].apply(_parse_date)
+
+        # Remove linhas completamente sem dados de vendedor e data
+        df = df[~(df.get("vendedor", pd.Series(dtype=str)).isna()
+                  & df.get("data_pagto", pd.Series(dtype="datetime64[ns]")).isna())]
 
         df = df.reset_index(drop=True)
 
