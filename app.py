@@ -1138,20 +1138,29 @@ with _tab_c:
     </div>
     """, unsafe_allow_html=True)
 
+    # Chave dinâmica — incrementar força o uploader a resetar (limpar arquivos)
+    if "_uploader_key" not in st.session_state:
+        st.session_state["_uploader_key"] = 0
+
     arquivos = st.file_uploader(
         "Arraste os PDFs dos contratos aqui",
         type="pdf",
         accept_multiple_files=True,
         label_visibility="collapsed",
+        key=f"uploader_{st.session_state['_uploader_key']}",
     )
 
     if arquivos:
         n = len(arquivos)
         st.info(f"**{n} arquivo(s) carregado(s).** Clique em Processar para extrair as informações.")
 
-        col_btn, _ = st.columns([1, 3])
+        col_btn, col_lim, _ = st.columns([2, 1, 2])
         with col_btn:
             processar = st.button("🔍 Processar Contratos", type="primary", use_container_width=True)
+        with col_lim:
+            if st.button("🗑️ Limpar arquivos", use_container_width=True, key="btn_clear_uploader"):
+                st.session_state["_uploader_key"] += 1
+                st.rerun()
 
         if processar:
             if not api_key:
