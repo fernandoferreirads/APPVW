@@ -118,11 +118,17 @@ def _get_ms_token(client_id: str) -> str:
     )
 
 
+def _url_hash(sharing_url: str) -> str:
+    import hashlib
+    return hashlib.md5(sharing_url.encode()).hexdigest()[:10]
+
+
 def _get_ids(token: str, sharing_url: str) -> tuple[str, str]:
-    """Resolve sharing URL → (drive_id, item_id). Reutiliza cache do app principal."""
-    for key, val in list(st.session_state.items()):
-        if key.startswith("_xl_ids_") and isinstance(val, (tuple, list)) and len(val) == 3:
-            return val[0], val[1]
+    """Resolve sharing URL → (drive_id, item_id). Cache isolado por URL."""
+    cache_key = f"_dash_file_{_url_hash(sharing_url)}"
+    cached = st.session_state.get(cache_key)
+    if cached:
+        return cached
 
     encoded = base64.urlsafe_b64encode(sharing_url.encode()).decode().rstrip("=")
     r = requests.get(
@@ -132,11 +138,14 @@ def _get_ids(token: str, sharing_url: str) -> tuple[str, str]:
     )
     r.raise_for_status()
     d = r.json()
-    return d["parentReference"]["driveId"], d["id"]
+    ids = (d["parentReference"]["driveId"], d["id"])
+    st.session_state[cache_key] = ids
+    return ids
 
 
 def _list_worksheets(token: str, sharing_url: str) -> list[str]:
-    """Retorna lista de nomes de todas as abas; popula cache de ws_ids."""
+    """Retorna lista de nomes de todas as abas; popula cache de ws_ids por URL."""
+    uhash = _url_hash(sharing_url)
     drive_id, item_id = _get_ids(token, sharing_url)
     r = requests.get(
         f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}"
@@ -148,17 +157,19 @@ def _list_worksheets(token: str, sharing_url: str) -> list[str]:
     names = []
     for ws in r.json().get("value", []):
         names.append(ws["name"])
-        # Aproveita para popular o cache de ws_ids enquanto temos a lista
-        cache_key = f"_xl_ids_{ws['name']}"
-        if cache_key not in st.session_state:
-            st.session_state[cache_key] = (drive_id, item_id, ws["id"])
+        # Cache isolado por arquivo (url hash) + nome da aba
+        ck = f"_dash_ws_{uhash}_{ws['name']}"
+        if ck not in st.session_state:
+            st.session_state[ck] = (drive_id, item_id, ws["id"])
     return names
 
 
-def _get_ws_id(token: str, drive_id: str, item_id: str, aba: str) -> str:
-    """Retorna ws_id para a aba especificada; usa cache quando disponível."""
-    cache_key = f"_xl_ids_{aba}"
-    cached = st.session_state.get(cache_key)
+def _get_ws_id(token: str, drive_id: str, item_id: str, aba: str,
+               sharing_url: str = "") -> str:
+    """Retorna ws_id para a aba especificada; usa cache isolado por arquivo."""
+    uhash     = _url_hash(sharing_url) if sharing_url else "default"
+    cache_key = f"_dash_ws_{uhash}_{aba}"
+    cached    = st.session_state.get(cache_key)
     if cached and len(cached) == 3:
         return cached[2]
 
@@ -209,7 +220,7 @@ def load_data(client_id: str, sharing_url: str, aba: str) -> tuple[pd.DataFrame 
     try:
         token             = _get_ms_token(client_id)
         drive_id, item_id = _get_ids(token, sharing_url)
-        ws_id             = _get_ws_id(token, drive_id, item_id, aba)
+        ws_id             = _get_ws_id(token, drive_id, item_id, aba, sharing_url)
         values            = _read_ws(token, drive_id, item_id, ws_id)
 
         if not values or len(values) < 2:
@@ -676,7 +687,7 @@ def render_dashboard(client_id: str = "", sharing_url: str = "") -> None:
 
     # ── Resolve ws_id da aba selecionada ──────────────────────────────────────
     try:
-        ws_id = _get_ws_id(token, drive_id, item_id, aba)
+        ws_id = _get_ws_id(token, drive_id, item_id, aba, sharing_url)
     except Exception as e:
         st.error(f"❌ Erro ao acessar aba '{aba}': {e}")
         return
