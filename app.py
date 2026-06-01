@@ -1384,6 +1384,23 @@ with _tab_c:
     if "avulso_items" not in st.session_state:
         st.session_state["avulso_items"] = []
 
+    # Seletor de aba de destino — visível sempre, antes do formulário
+    col_av_label, col_av_sel, _ = st.columns([1, 2, 2])
+    with col_av_label:
+        st.markdown(
+            "<div style='padding-top:8px;color:#001e50;font-weight:600;"
+            "font-size:0.9rem;'>📅 Aba de destino</div>",
+            unsafe_allow_html=True,
+        )
+    with col_av_sel:
+        aba_selecionada_av = st.selectbox(
+            "Aba avulso",
+            options=_meses_opcoes,
+            index=0,
+            key="aba_destino_av",
+            label_visibility="collapsed",
+        )
+
     # Formulário de entrada
     with st.container(border=True):
         # Linha 1 — Nome e CPF
@@ -1470,23 +1487,6 @@ with _tab_c:
             for it in _av_items
         ])
         st.dataframe(_av_df, use_container_width=True, hide_index=True)
-
-        # Seletor de aba para avulso (independente do seletor de contratos)
-        col_av_label, col_av_sel, _ = st.columns([1, 2, 2])
-        with col_av_label:
-            st.markdown(
-                "<div style='padding-top:8px;color:#001e50;font-weight:600;"
-                "font-size:0.9rem;'>📅 Aba de destino</div>",
-                unsafe_allow_html=True,
-            )
-        with col_av_sel:
-            aba_selecionada_av = st.selectbox(
-                "Aba avulso",
-                options=_meses_opcoes,
-                index=0,
-                key="aba_destino_av",
-                label_visibility="collapsed",
-            )
 
         col_av_ins, col_av_lim = st.columns([4, 1])
 
