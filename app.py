@@ -991,7 +991,7 @@ if st.session_state.get("_msal_auth_status", "not_auth") == "not_auth":
 _gemini_default    = os.getenv("GEMINI_API_KEY")       or st.secrets.get("GEMINI_API_KEY",       "")
 _client_id_default = os.getenv("AZURE_CLIENT_ID")     or st.secrets.get("AZURE_CLIENT_ID",      "4c19cc34-0c80-4dcd-9d8c-f0e35c0f48b5")
 _excel_url_default = os.getenv("EXCEL_SHARING_URL")   or st.secrets.get("EXCEL_SHARING_URL",    "https://1drv.ms/x/c/34eb48bbe5babf33/IQBkkgUSG37eT7AUIIT0EnFIAawdB8KZ6Yx5ypjyblkZbdU?e=DuWAzF")
-_dash_url_default  = os.getenv("DASH_SHARING_URL")    or st.secrets.get("DASH_SHARING_URL",     "")
+_dash_url_default  = os.getenv("DASH_SHARING_URL")    or st.secrets.get("DASH_SHARING_URL",     "https://1drv.ms/x/c/34eb48bbe5babf33/IQAkPFay4CHMQK5jX-wzXc86AQa8yU6Irz1PUlG_jqgEh5c?e=ioOQEQ")
 
 with st.popover("⚙️  Configurações"):
     col1, col2 = st.columns(2)
