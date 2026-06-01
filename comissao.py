@@ -392,14 +392,17 @@ def calc_commission(df: pd.DataFrame) -> dict:
         if not validos.any():
             continue
 
-        serie_valida = serie[validos]
+        # Normaliza ANTES do groupby: strip + upper evita duplicatas por
+        # variação de espaços/capitalização entre células do Excel
+        serie_norm = serie[validos].apply(lambda x: str(x).strip().upper())
 
-        for prod_val, grupo in serie_valida.groupby(serie_valida):
-            prod_str = str(prod_val).strip()
+        for prod_str, grupo in serie_norm.groupby(serie_norm):
             if not prod_str:
                 continue
             valor_unit = _commission(prod_str)
-            qtd        = len(grupo)
+            if valor_unit == 0.0:
+                continue  # ignora textos sem comissão mapeada ("SEM PRODUTO", etc.)
+            qtd = len(grupo)
             resultados.append({
                 "categoria": col_label,
                 "produto":   prod_str,
