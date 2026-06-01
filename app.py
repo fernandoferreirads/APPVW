@@ -617,6 +617,19 @@ def nome_aba_atual() -> str:
     return f"{MESES_PT[now.month]} {now.year}"
 
 
+def _ultimos_meses(n: int = 6) -> list[str]:
+    """Retorna os últimos n meses no formato 'MES ANO', mais recente primeiro."""
+    result = []
+    month, year = datetime.now().month, datetime.now().year
+    for _ in range(n):
+        result.append(f"{MESES_PT[month]} {year}")
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+    return result
+
+
 def _fazer_insercao(
     base_url: str,
     hdrs: dict,
@@ -660,18 +673,20 @@ def _fazer_insercao(
     return linha_ini
 
 
-def inserir_linhas_excel(linhas: list, client_id: str, sharing_url: str) -> int:
+def inserir_linhas_excel(linhas: list, client_id: str, sharing_url: str,
+                         aba: str | None = None) -> int:
     token                    = _get_valid_token(client_id)
-    aba                      = nome_aba_atual()
+    aba                      = aba or nome_aba_atual()
     drive_id, item_id, base  = _get_excel_ids(token, sharing_url, aba)
     session_id               = _get_or_create_session(token, drive_id, item_id)
     hdrs                     = _excel_hdrs(token, session_id)
     return _fazer_insercao(base, hdrs, linhas, token, item_id)
 
 
-def inserir_e_colorir_excel(itens: list, client_id: str, sharing_url: str) -> int:
+def inserir_e_colorir_excel(itens: list, client_id: str, sharing_url: str,
+                             aba: str | None = None) -> int:
     token                    = _get_valid_token(client_id)
-    aba                      = nome_aba_atual()
+    aba                      = aba or nome_aba_atual()
     drive_id, item_id, base  = _get_excel_ids(token, sharing_url, aba)
     session_id               = _get_or_create_session(token, drive_id, item_id)
     hdrs                     = _excel_hdrs(token, session_id)
@@ -1138,6 +1153,59 @@ with _tab_c:
     </div>
     """, unsafe_allow_html=True)
 
+    # ── Seletor de aba de destino ─────────────────────────────────────────────
+    st.markdown("""
+    <style>
+    div[data-testid="stHorizontalBlock"]:has(> div > div[data-testid="stSelectbox"]#aba_destino_wrap) {
+        position: sticky; top: 3.5rem; z-index: 100;
+    }
+    .aba-selector-wrap {
+        background: linear-gradient(135deg, #001e50 0%, #002d7a 100%);
+        border-radius: 10px;
+        padding: 0.75rem 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+        box-shadow: 0 4px 16px rgba(0,30,80,0.18);
+    }
+    .aba-selector-wrap .aba-label {
+        color: rgba(255,255,255,0.85);
+        font-size: 0.85rem;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    _meses_opcoes = _ultimos_meses(6)
+
+    with st.container():
+        col_label, col_sel = st.columns([1, 3])
+        with col_label:
+            st.markdown(
+                "<div style='padding-top:8px;color:#001e50;font-weight:600;"
+                "font-size:0.9rem;'>📅 Aba de destino</div>",
+                unsafe_allow_html=True,
+            )
+        with col_sel:
+            aba_selecionada = st.selectbox(
+                "Aba de destino",
+                options=_meses_opcoes,
+                index=0,
+                key="aba_destino",
+                label_visibility="collapsed",
+            )
+
+    st.markdown(
+        f"<div style='background:#f0f4ff;border:1.5px solid #c7d4f0;border-radius:8px;"
+        f"padding:0.45rem 1rem;margin-bottom:1rem;font-size:0.83rem;color:#001e50;'>"
+        f"📌 Contratos e cadastros avulsos serão inseridos na aba <b>{aba_selecionada}</b>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
     # Chave dinâmica — incrementar força o uploader a resetar (limpar arquivos)
     if "_uploader_key" not in st.session_state:
         st.session_state["_uploader_key"] = 0
@@ -1282,8 +1350,7 @@ with _tab_c:
                 st.rerun()
 
         with col_ins:
-            aba_atual = nome_aba_atual()
-            label_btn = f"✅ Inserir {len(resultados)} linha(s) na planilha → aba {aba_atual}"
+            label_btn = f"✅ Inserir {len(resultados)} linha(s) na planilha → aba {aba_selecionada}"
 
             if not excel_ok:
                 st.warning("Faça login com sua conta Microsoft nas Configurações para habilitar a inserção.")
@@ -1292,10 +1359,10 @@ with _tab_c:
                     try:
                         linhas = [para_linha_sheets(r) for r in resultados]
                         with st.spinner(f"⏳ Inserindo {len(linhas)} linha(s) na planilha…"):
-                            linha_ini = inserir_linhas_excel(linhas, az_client_id, excel_url)
+                            linha_ini = inserir_linhas_excel(linhas, az_client_id, excel_url, aba_selecionada)
                         st.success(
                             f"✅ **{len(linhas)} linha(s)** inserida(s) com sucesso na aba "
-                            f"**{aba_atual}** a partir da linha **{linha_ini}**!"
+                            f"**{aba_selecionada}** a partir da linha **{linha_ini}**!"
                         )
                         del st.session_state["resultados"]
                         st.balloons()
@@ -1420,22 +1487,21 @@ with _tab_c:
                 st.rerun()
 
         with col_av_ins:
-            _av_aba = nome_aba_atual()
             if not excel_ok:
                 st.warning("Faça login com sua conta Microsoft nas Configurações para habilitar a inserção.")
             else:
                 if st.button(
-                    f"✅ Inserir {len(_av_items)} item(ns) na planilha → aba {_av_aba}",
+                    f"✅ Inserir {len(_av_items)} item(ns) na planilha → aba {aba_selecionada}",
                     type="primary",
                     key="av_inserir",
                     use_container_width=True,
                 ):
                     try:
                         with st.spinner(f"⏳ Inserindo {len(_av_items)} item(ns) na planilha…"):
-                            _av_ini = inserir_e_colorir_excel(_av_items, az_client_id, excel_url)
+                            _av_ini = inserir_e_colorir_excel(_av_items, az_client_id, excel_url, aba_selecionada)
                         st.success(
                             f"✅ **{len(_av_items)} item(ns)** inserido(s) com sucesso na aba "
-                            f"**{_av_aba}** a partir da linha **{_av_ini}**!"
+                            f"**{aba_selecionada}** a partir da linha **{_av_ini}**!"
                         )
                         st.session_state["avulso_items"] = []
                         st.balloons()
