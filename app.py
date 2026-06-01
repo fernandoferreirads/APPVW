@@ -1198,14 +1198,6 @@ with _tab_c:
                 label_visibility="collapsed",
             )
 
-    st.markdown(
-        f"<div style='background:#f0f4ff;border:1.5px solid #c7d4f0;border-radius:8px;"
-        f"padding:0.45rem 1rem;margin-bottom:1rem;font-size:0.83rem;color:#001e50;'>"
-        f"📌 Contratos e cadastros avulsos serão inseridos na aba <b>{aba_selecionada}</b>"
-        f"</div>",
-        unsafe_allow_html=True,
-    )
-
     # Chave dinâmica — incrementar força o uploader a resetar (limpar arquivos)
     if "_uploader_key" not in st.session_state:
         st.session_state["_uploader_key"] = 0
@@ -1479,6 +1471,23 @@ with _tab_c:
         ])
         st.dataframe(_av_df, use_container_width=True, hide_index=True)
 
+        # Seletor de aba para avulso (independente do seletor de contratos)
+        col_av_label, col_av_sel, _ = st.columns([1, 2, 2])
+        with col_av_label:
+            st.markdown(
+                "<div style='padding-top:8px;color:#001e50;font-weight:600;"
+                "font-size:0.9rem;'>📅 Aba de destino</div>",
+                unsafe_allow_html=True,
+            )
+        with col_av_sel:
+            aba_selecionada_av = st.selectbox(
+                "Aba avulso",
+                options=_meses_opcoes,
+                index=0,
+                key="aba_destino_av",
+                label_visibility="collapsed",
+            )
+
         col_av_ins, col_av_lim = st.columns([4, 1])
 
         with col_av_lim:
@@ -1491,17 +1500,17 @@ with _tab_c:
                 st.warning("Faça login com sua conta Microsoft nas Configurações para habilitar a inserção.")
             else:
                 if st.button(
-                    f"✅ Inserir {len(_av_items)} item(ns) na planilha → aba {aba_selecionada}",
+                    f"✅ Inserir {len(_av_items)} item(ns) na planilha → aba {aba_selecionada_av}",
                     type="primary",
                     key="av_inserir",
                     use_container_width=True,
                 ):
                     try:
                         with st.spinner(f"⏳ Inserindo {len(_av_items)} item(ns) na planilha…"):
-                            _av_ini = inserir_e_colorir_excel(_av_items, az_client_id, excel_url, aba_selecionada)
+                            _av_ini = inserir_e_colorir_excel(_av_items, az_client_id, excel_url, aba_selecionada_av)
                         st.success(
                             f"✅ **{len(_av_items)} item(ns)** inserido(s) com sucesso na aba "
-                            f"**{aba_selecionada}** a partir da linha **{_av_ini}**!"
+                            f"**{aba_selecionada_av}** a partir da linha **{_av_ini}**!"
                         )
                         st.session_state["avulso_items"] = []
                         st.balloons()
