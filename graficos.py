@@ -360,7 +360,7 @@ def _chart_spf(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
         ] for i in range(len(label_tabela))},
     })
 
-    y_max = max(max(total_spf, default=0) * 1.35, 60)
+    y_max = max(max(total_spf, default=0) * 1.35, 100)
 
     fig = go.Figure()
 
