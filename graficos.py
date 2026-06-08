@@ -192,7 +192,7 @@ def _chart_produto(
         sub    = df_w[df_w["_periodo"] == period]
         vals   = sub[col].fillna("").astype(str).str.strip()
         if filtro:
-            ok = vals[vals.str.upper() == filtro.upper()]
+            ok = vals[vals.str.contains(filtro, case=False, na=False, regex=False)]
         else:
             ok = vals[~vals.isin(["", "nan", "None"])]
         qtd.append(len(ok))
@@ -406,7 +406,7 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                 "text-align:center;margin-bottom:2px'>SEGUROS</p>",
                 unsafe_allow_html=True,
             )
-            st.caption("Qtd de SPF produzidos (barras, eixo esq.) · % AAK = SPF / total contratos (linha, eixo dir.)")
+            st.caption("Qtd de Seguro VW produzidos (barras, eixo esq.) · % AAK = Seguro VW / total contratos (linha, eixo dir.)")
 
             fig3, tbl3 = _chart_seguros(df)
             st.plotly_chart(fig3, use_container_width=True)
