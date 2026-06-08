@@ -204,17 +204,20 @@ def _chart_garantias(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     else:
         ma_qtd = ma_pct = 0
 
+    # label para o eixo X do gráfico (dois linhas) vs label para a tabela (sem \n)
     labels.append("TENDÊNCIA\nM.A")
+    label_tabela = [lbl.replace("\n", " ") for lbl in labels]   # sem \n no DataFrame
     qtd_ge.append(ma_qtd)
     pct_aak.append(ma_pct)
 
     # Cores: últimos meses = azul, TENDÊNCIA M.A = laranja
     bar_colors = [_AZUL_NV] * (len(labels) - 1) + [_LARANJA_SN]
 
-    # Tabela resumo
+    # Tabela resumo (usa label_tabela para evitar \n em nomes de coluna)
     df_tabela = pd.DataFrame({
         "":       ["Qtd", "% AAK"],
-        **{labels[i]: [qtd_ge[i], f"{pct_aak[i]:.0f}%"] for i in range(len(labels))},
+        **{label_tabela[i]: [qtd_ge[i], f"{pct_aak[i]:.0f}%"]
+           for i in range(len(label_tabela))},
     })
 
     # Escalas dos eixos
@@ -385,16 +388,21 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
     # ═══════════════════════════════════════════════════════════════════════════
     # Gráfico 2 — Garantias (Qtd + % AAK)
     # ═══════════════════════════════════════════════════════════════════════════
-    with st.container(border=True):
-        st.markdown(
-            "<p style='font-size:1rem;font-weight:700;color:#001e50;"
-            "text-align:center;margin-bottom:2px'>GARANTIAS</p>",
-            unsafe_allow_html=True,
-        )
-        st.caption("Qtd de GE produzidas (barras, eixo esq.) · % AAK = GE / total contratos (linha, eixo dir.)")
+    try:
+        with st.container(border=True):
+            st.markdown(
+                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+                "text-align:center;margin-bottom:2px'>GARANTIAS</p>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Qtd de GE produzidas (barras, eixo esq.) · % AAK = GE / total contratos (linha, eixo dir.)")
 
-        fig2, tbl2 = _chart_garantias(df)
-        st.plotly_chart(fig2, use_container_width=True)
-        if not tbl2.empty:
-            st.dataframe(tbl2, use_container_width=True, hide_index=True,
-                         column_config={"": st.column_config.TextColumn("", width="medium")})
+            fig2, tbl2 = _chart_garantias(df)
+            st.plotly_chart(fig2, use_container_width=True)
+            if not tbl2.empty:
+                st.dataframe(tbl2, use_container_width=True, hide_index=True,
+                             column_config={"": st.column_config.TextColumn("", width="medium")})
+    except Exception as _e_gar:
+        st.error(f"❌ Erro ao renderizar GARANTIAS: {_e_gar}")
+        import traceback
+        st.code(traceback.format_exc(), language="python")
