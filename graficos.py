@@ -2,7 +2,7 @@
 graficos.py — Gráficos Nativos F&I
 Visualizações interativas construídas diretamente do BIGBASE via Plotly.
 
-Cada gráfico é um reflexo fiel dos gráficos existentes na planilha "BIG DASHBOARD F&I",
+Cada gráfico replica fielmente os gráficos da planilha 'BIG DASHBOARD F&I',
 com a vantagem de serem interativos, filtráveis e sem dependência de sessão Excel.
 """
 
@@ -17,9 +17,9 @@ import streamlit as st
 from comissao import load_bigbase
 
 # ─── Paleta fiel ao Excel ──────────────────────────────────────────────────────
-_AZUL_NV      = "#4472C4"   # azul Excel (CONTRATOS NV)
-_LARANJA_SN   = "#ED7D31"   # laranja Excel (CONTRATOS SN)
-_VW_BLUE      = "#001E50"
+_AZUL_NV    = "#4472C4"   # azul Excel (barras principais)
+_LARANJA_SN = "#ED7D31"   # laranja Excel (SN / linha AAK / barra tendência)
+_VW_BLUE    = "#001E50"
 
 _MESES_PT = {
     1: "JANEIRO", 2: "FEVEREIRO", 3: "MARÇO",    4: "ABRIL",
@@ -30,13 +30,25 @@ _MESES_PT = {
 # ─── Helpers de data ──────────────────────────────────────────────────────────
 
 def _meses_range(n: int = 6) -> list[tuple[int, int, str]]:
-    """
-    Retorna lista de (ano, mes, 'NOME') dos últimos n-1 meses completos
-    + mês vigente, do mais antigo ao mais recente.
-    """
+    """n-1 meses completos + mês vigente, do mais antigo ao mais recente."""
     hoje = datetime.now()
     meses: list[tuple[int, int, str]] = []
     m, y = hoje.month, hoje.year
+    for _ in range(n):
+        meses.append((y, m, _MESES_PT[m]))
+        m -= 1
+        if m == 0:
+            m, y = 12, y - 1
+    return list(reversed(meses))
+
+
+def _meses_completos(n: int = 7) -> list[tuple[int, int, str]]:
+    """Últimos n meses COMPLETOS (sem o mês vigente), do mais antigo ao mais recente."""
+    hoje = datetime.now()
+    meses: list[tuple[int, int, str]] = []
+    m, y = hoje.month - 1, hoje.year
+    if m == 0:
+        m, y = 12, y - 1
     for _ in range(n):
         meses.append((y, m, _MESES_PT[m]))
         m -= 1
@@ -49,46 +61,40 @@ def _periodo_atual() -> pd.Period:
     return pd.Period(datetime.now(), "M")
 
 
+def _fig_sem_dados(msg: str, height: int = 300) -> go.Figure:
+    """Figura vazia com mensagem centralizada."""
+    fig = go.Figure()
+    fig.add_annotation(
+        text=msg, xref="paper", yref="paper", x=0.5, y=0.5,
+        showarrow=False, font=dict(size=13, color="#6b7280"),
+    )
+    fig.update_layout(
+        template="plotly_white", height=height,
+        xaxis=dict(visible=False), yaxis=dict(visible=False),
+    )
+    return fig
+
+
 # ─── Gráfico 1 — Contratos NV vs SN por Mês ──────────────────────────────────
 
 def _chart_contratos_nv_sn(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
-    """
-    Barras empilhadas: CONTRATOS NV (azul) vs CONTRATOS SN (laranja).
-    Reproduz fielmente o gráfico da aba 'BIG DASHBOARD F&I'.
-
-    Retorna (fig, df_tabela) para exibir a tabela resumo abaixo do gráfico.
-    """
+    """Barras empilhadas: CONTRATOS NV (azul) vs CONTRATOS SN (laranja)."""
     meses = _meses_range(6)
     hoje  = _periodo_atual()
 
-    # Coluna tipo_veiculo pode não existir se BIGBASE ainda não foi recarregado
     if "tipo_veiculo" not in df.columns:
-        fig_vazio = go.Figure()
-        fig_vazio.add_annotation(
-            text="Coluna tipo_veiculo não encontrada — clique em 🔄 para recarregar o BIGBASE",
-            xref="paper", yref="paper", x=0.5, y=0.5,
-            showarrow=False,
-            font=dict(size=14, color="#6b7280"),
-        )
-        fig_vazio.update_layout(
-            template="plotly_white", height=300,
-            xaxis=dict(visible=False), yaxis=dict(visible=False),
-        )
-        return fig_vazio, pd.DataFrame()
+        return _fig_sem_dados(
+            "Coluna tipo_veiculo não encontrada — clique em 🔄 para recarregar"
+        ), pd.DataFrame()
 
-    # Filtra apenas N e S (ignora vazio, 0, etc.)
     df_tipo = df[
         df["tipo_veiculo"].fillna("").str.strip().str.upper().isin(["N", "S"])
     ].copy()
-
-    if "data_pagto" in df_tipo.columns:
-        df_tipo["_periodo"] = df_tipo["data_pagto"].dt.to_period("M")
-    else:
-        df_tipo["_periodo"] = pd.NaT
+    df_tipo["_periodo"] = df_tipo["data_pagto"].dt.to_period("M") \
+        if "data_pagto" in df_tipo.columns else pd.NaT
 
     nv_vals: list[int] = []
     sn_vals: list[int] = []
-
     for (y, m, _) in meses:
         period = pd.Period(year=y, month=m, freq="M")
         sub    = df_tipo[df_tipo["_periodo"] == period]
@@ -97,13 +103,11 @@ def _chart_contratos_nv_sn(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
 
     labels = [nome for (_, _, nome) in meses]
 
-    # ── Tendência M.A — média dos 3 últimos meses completos ──────────────────
-    idx_completos = [
-        i for i, (y, m, _) in enumerate(meses)
-        if pd.Period(year=y, month=m, freq="M") < hoje
-    ]
-    if len(idx_completos) >= 1:
-        ult3 = idx_completos[-3:]
+    # Tendência M.A — média dos 3 últimos meses completos
+    idx_comp = [i for i, (y, m, _) in enumerate(meses)
+                if pd.Period(year=y, month=m, freq="M") < hoje]
+    if idx_comp:
+        ult3  = idx_comp[-3:]
         ma_nv = round(sum(nv_vals[i] for i in ult3) / len(ult3))
         ma_sn = round(sum(sn_vals[i] for i in ult3) / len(ult3))
     else:
@@ -113,63 +117,171 @@ def _chart_contratos_nv_sn(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     nv_vals.append(ma_nv)
     sn_vals.append(ma_sn)
 
-    # ── Tabela resumo (igual à legenda da planilha) ───────────────────────────
     df_tabela = pd.DataFrame({
-        "":            ["CONTRATOS SN", "CONTRATOS NV"],
+        "": ["CONTRATOS SN", "CONTRATOS NV"],
         **{labels[i]: [sn_vals[i], nv_vals[i]] for i in range(len(labels))},
     })
 
-    # ── Figura ────────────────────────────────────────────────────────────────
     total_vals = [nv + sn for nv, sn in zip(nv_vals, sn_vals)]
     y_max      = max(max(total_vals, default=0) * 1.18, 300)
 
     fig = go.Figure()
-
-    # Barra NV (azul) — adicionada PRIMEIRO → fica na base
     fig.add_trace(go.Bar(
-        name         = "CONTRATOS NV",
+        name="CONTRATOS NV", x=labels, y=nv_vals,
+        marker_color=_AZUL_NV,
+        text=[str(v) if v > 0 else "" for v in nv_vals],
+        textposition="inside", insidetextanchor="middle",
+        textfont=dict(color="white", size=12),
+        hovertemplate="<b>%{x}</b><br>NV: %{y}<extra></extra>",
+    ))
+    fig.add_trace(go.Bar(
+        name="CONTRATOS SN", x=labels, y=sn_vals,
+        marker_color=_LARANJA_SN,
+        text=[str(v) if v > 0 else "" for v in sn_vals],
+        textposition="inside", insidetextanchor="middle",
+        textfont=dict(color="white", size=12),
+        hovertemplate="<b>%{x}</b><br>SN: %{y}<extra></extra>",
+    ))
+    fig.update_layout(
+        barmode="stack", template="plotly_white", height=440,
+        plot_bgcolor="white", paper_bgcolor="white", bargap=0.28,
+        yaxis=dict(dtick=50, range=[0, y_max], showgrid=True,
+                   gridcolor="#e5e7eb", zeroline=False),
+        xaxis=dict(showgrid=False, tickfont=dict(size=11)),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.22,
+                    xanchor="left", x=0, font=dict(size=12),
+                    traceorder="reversed"),
+        margin=dict(l=20, r=20, t=20, b=70),
+        hoverlabel=dict(bgcolor="white", font_size=13),
+    )
+    return fig, df_tabela
+
+
+# ─── Gráfico 2 — Garantias (Qtd + % AAK) ────────────────────────────────────
+
+def _chart_garantias(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
+    """
+    Barras azuis (Qtd GE, eixo esquerdo) + linha laranja (% AAK, eixo direito).
+    % AAK = GE produzidas / total contratos do mês × 100.
+    TENDÊNCIA M.A = barra laranja com média móvel dos últimos 3 meses completos.
+    Reproduz fielmente o gráfico GARANTIAS da aba 'BIG DASHBOARD F&I'.
+    """
+    meses = _meses_completos(7)   # 7 meses completos, sem o mês vigente
+
+    if "ge" not in df.columns or "data_pagto" not in df.columns:
+        return _fig_sem_dados(
+            "Colunas 'ge' ou 'data_pagto' não encontradas no BIGBASE"
+        ), pd.DataFrame()
+
+    df_w = df.copy()
+    df_w["_periodo"] = df_w["data_pagto"].dt.to_period("M")
+
+    qtd_ge:   list[int]   = []
+    total_ct: list[int]   = []
+
+    for (y, m, _) in meses:
+        period  = pd.Period(year=y, month=m, freq="M")
+        sub     = df_w[df_w["_periodo"] == period]
+        ge_ok   = sub["ge"].fillna("").str.strip()
+        qtd_ge.append(int((ge_ok != "").sum()))
+        total_ct.append(len(sub))
+
+    # % AAK = GE / total contratos × 100
+    pct_aak: list[float] = [
+        round(q / t * 100, 1) if t > 0 else 0.0
+        for q, t in zip(qtd_ge, total_ct)
+    ]
+
+    labels = [nome for (_, _, nome) in meses]
+
+    # Tendência M.A — média dos últimos 3 meses completos
+    if len(qtd_ge) >= 3:
+        ma_qtd = round(sum(qtd_ge[-3:])   / 3)
+        ma_pct = round(sum(pct_aak[-3:])  / 3, 1)
+    elif qtd_ge:
+        ma_qtd = qtd_ge[-1]
+        ma_pct = pct_aak[-1]
+    else:
+        ma_qtd = ma_pct = 0
+
+    labels.append("TENDÊNCIA\nM.A")
+    qtd_ge.append(ma_qtd)
+    pct_aak.append(ma_pct)
+
+    # Cores: últimos meses = azul, TENDÊNCIA M.A = laranja
+    bar_colors = [_AZUL_NV] * (len(labels) - 1) + [_LARANJA_SN]
+
+    # Tabela resumo
+    df_tabela = pd.DataFrame({
+        "":       ["Qtd", "% AAK"],
+        **{labels[i]: [qtd_ge[i], f"{pct_aak[i]:.0f}%"] for i in range(len(labels))},
+    })
+
+    # Escalas dos eixos
+    y_max_qtd = max(max(qtd_ge, default=0) * 1.20, 350)
+    y_max_pct = max(max(pct_aak, default=0) * 1.20, 140)
+
+    fig = go.Figure()
+
+    # ── Barras (Qtd) — eixo esquerdo ─────────────────────────────────────────
+    fig.add_trace(go.Bar(
+        name         = "Qtd",
         x            = labels,
-        y            = nv_vals,
-        marker_color = _AZUL_NV,
-        text         = [str(v) if v > 0 else "" for v in nv_vals],
-        textposition = "inside",
-        textfont     = dict(color="white", size=12, family="Inter, sans-serif"),
-        insidetextanchor = "middle",
-        hovertemplate= "<b>%{x}</b><br>NV: %{y}<extra></extra>",
+        y            = qtd_ge,
+        marker_color = bar_colors,
+        yaxis        = "y",
+        # Valor em destaque apenas na barra de tendência
+        text         = ["" if i < len(labels) - 1 else str(ma_qtd)
+                        for i in range(len(labels))],
+        textposition = "outside",
+        textfont     = dict(size=12, color=_LARANJA_SN, family="Inter, sans-serif"),
+        hovertemplate= "<b>%{x}</b><br>Qtd GE: %{y}<extra></extra>",
     ))
 
-    # Barra SN (laranja) — empilhada em cima
-    fig.add_trace(go.Bar(
-        name         = "CONTRATOS SN",
+    # ── Linha % AAK — eixo direito ────────────────────────────────────────────
+    fig.add_trace(go.Scatter(
+        name         = "% AAK",
         x            = labels,
-        y            = sn_vals,
-        marker_color = _LARANJA_SN,
-        text         = [str(v) if v > 0 else "" for v in sn_vals],
-        textposition = "inside",
-        textfont     = dict(color="white", size=12, family="Inter, sans-serif"),
-        insidetextanchor = "middle",
-        hovertemplate= "<b>%{x}</b><br>SN: %{y}<extra></extra>",
+        y            = pct_aak,
+        mode         = "lines+markers",
+        yaxis        = "y2",
+        line         = dict(color=_LARANJA_SN, width=2.5),
+        marker       = dict(size=6, color=_LARANJA_SN, symbol="circle"),
+        hovertemplate= "<b>%{x}</b><br>% AAK: %{y:.1f}%<extra></extra>",
     ))
 
     fig.update_layout(
-        barmode      = "stack",
         template     = "plotly_white",
         height       = 440,
         plot_bgcolor = "white",
         paper_bgcolor= "white",
         bargap       = 0.28,
+        # Eixo esquerdo — Qtd
         yaxis = dict(
-            dtick      = 50,
-            range      = [0, y_max],
-            showgrid   = True,
-            gridcolor  = "#e5e7eb",
-            gridwidth  = 1,
+            title    = "",
+            side     = "left",
+            dtick    = 50,
+            range    = [0, y_max_qtd],
+            showgrid = True,
+            gridcolor= "#e5e7eb",
+            zeroline = False,
+            tickfont = dict(size=11),
+        ),
+        # Eixo direito — % AAK
+        yaxis2 = dict(
+            title      = "",
+            side       = "right",
+            overlaying = "y",
+            range      = [0, y_max_pct],
+            dtick      = 20,
+            ticksuffix = "%",
+            showgrid   = False,
             zeroline   = False,
             tickfont   = dict(size=11),
         ),
         xaxis = dict(
-            showgrid   = False,
-            tickfont   = dict(size=11),
+            showgrid = False,
+            tickfont = dict(size=11),
         ),
         legend = dict(
             orientation = "h",
@@ -178,9 +290,8 @@ def _chart_contratos_nv_sn(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
             xanchor     = "left",
             x           = 0,
             font        = dict(size=12),
-            traceorder  = "reversed",   # SN em cima, NV embaixo — igual ao Excel
         ),
-        margin = dict(l=20, r=20, t=20, b=70),
+        margin     = dict(l=20, r=50, t=20, b=70),
         hoverlabel = dict(bgcolor="white", font_size=13),
     )
 
@@ -206,7 +317,7 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
 
     # ── Pré-requisitos ────────────────────────────────────────────────────────
     if st.session_state.get("_msal_auth_status") != "authenticated":
-        st.info("🔑 Faça login com sua conta Microsoft nas **Configurações** para visualizar os gráficos.")
+        st.info("🔑 Faça login com sua conta Microsoft nas **Configurações**.")
         return
     if not sharing_url:
         st.info("⚙️ Configure o **Link do Excel — Dashboard** nas **Configurações**.")
@@ -244,35 +355,46 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
             st.session_state.pop("_comm_ts_bigbase", None)
             st.rerun()
 
-    # Aviso se tipo_veiculo não foi encontrado — provavelmente cache desatualizado
     if "tipo_veiculo" not in df.columns or df["tipo_veiculo"].isna().all():
         st.warning(
             "⚠️ Coluna **tipo_veiculo** não encontrada no BIGBASE carregado. "
-            "Se você acabou de renomear a coluna no Excel, clique em **🔄** acima para recarregar."
+            "Se você renomeou a coluna no Excel, clique em **🔄** para recarregar."
         )
 
     st.divider()
 
-    # ═════════════════════════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════════════════════════
     # Gráfico 1 — Contratos NV vs SN
-    # ═════════════════════════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════════════════════════════
     with st.container(border=True):
         st.markdown(
-            "<p style='font-size:1rem;font-weight:600;color:#001e50;margin-bottom:4px'>"
-            "Contratos por Tipo — Novos vs Seminovos</p>",
+            "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+            "text-align:center;margin-bottom:2px'>CONTRATOS</p>",
             unsafe_allow_html=True,
         )
-        st.caption("Últimos 5 meses completos + mês vigente + Tendência (média móvel 3M)")
+        st.caption("Últimos 5 meses completos + mês vigente + Tendência M.A (média 3M)")
 
-        fig1, df_tabela = _chart_contratos_nv_sn(df)
+        fig1, tbl1 = _chart_contratos_nv_sn(df)
         st.plotly_chart(fig1, use_container_width=True)
+        if not tbl1.empty:
+            st.dataframe(tbl1, use_container_width=True, hide_index=True,
+                         column_config={"": st.column_config.TextColumn("", width="medium")})
 
-        # Tabela resumo abaixo do gráfico (replica a legenda da planilha)
-        st.dataframe(
-            df_tabela,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "": st.column_config.TextColumn("", width="medium"),
-            },
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Gráfico 2 — Garantias (Qtd + % AAK)
+    # ═══════════════════════════════════════════════════════════════════════════
+    with st.container(border=True):
+        st.markdown(
+            "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+            "text-align:center;margin-bottom:2px'>GARANTIAS</p>",
+            unsafe_allow_html=True,
         )
+        st.caption("Qtd de GE produzidas (barras, eixo esq.) · % AAK = GE / total contratos (linha, eixo dir.)")
+
+        fig2, tbl2 = _chart_garantias(df)
+        st.plotly_chart(fig2, use_container_width=True)
+        if not tbl2.empty:
+            st.dataframe(tbl2, use_container_width=True, hide_index=True,
+                         column_config={"": st.column_config.TextColumn("", width="medium")})
