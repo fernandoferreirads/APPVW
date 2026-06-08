@@ -157,91 +157,84 @@ def _chart_contratos_nv_sn(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     return fig, df_tabela
 
 
-# ─── Gráfico 2 — Garantias (Qtd + % AAK) ────────────────────────────────────
+# ─── Helper genérico — Qtd + % AAK (reutilizado por GE, SPF, etc.) ──────────
 
-def _chart_garantias(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
+def _chart_produto(
+    df: pd.DataFrame,
+    col: str,
+    titulo: str,
+) -> tuple[go.Figure, pd.DataFrame]:
     """
-    Barras azuis (Qtd GE, eixo esquerdo) + linha laranja (% AAK, eixo direito).
-    % AAK = GE produzidas / total contratos do mês × 100.
-    TENDÊNCIA M.A = barra laranja com média móvel dos últimos 3 meses completos.
-    Reproduz fielmente o gráfico GARANTIAS da aba 'BIG DASHBOARD F&I'.
+    Barras azuis (Qtd, eixo esq.) + linha laranja (% AAK, eixo dir.).
+    % AAK = Qtd produto / total contratos do mês × 100.
+    TENDÊNCIA M.A = barra laranja (média 3 meses completos).
+    Usado por GE, SPF e qualquer produto com a mesma estrutura.
     """
-    meses = _meses_completos(7)   # 7 meses completos, sem o mês vigente
+    meses = _meses_completos(7)
 
-    if "ge" not in df.columns or "data_pagto" not in df.columns:
+    if col not in df.columns or "data_pagto" not in df.columns:
         return _fig_sem_dados(
-            "Colunas 'ge' ou 'data_pagto' não encontradas no BIGBASE"
+            f"Coluna '{col}' ou 'data_pagto' não encontrada no BIGBASE"
         ), pd.DataFrame()
 
     df_w = df.copy()
     df_w["_periodo"] = df_w["data_pagto"].dt.to_period("M")
 
-    qtd_ge:   list[int]   = []
+    qtd:      list[int]   = []
     total_ct: list[int]   = []
 
     for (y, m, _) in meses:
-        period  = pd.Period(year=y, month=m, freq="M")
-        sub     = df_w[df_w["_periodo"] == period]
-        ge_ok   = sub["ge"].fillna("").str.strip()
-        qtd_ge.append(int((ge_ok != "").sum()))
+        period = pd.Period(year=y, month=m, freq="M")
+        sub    = df_w[df_w["_periodo"] == period]
+        ok     = sub[col].fillna("").astype(str).str.strip()
+        ok     = ok[~ok.isin(["", "nan", "None"])]
+        qtd.append(len(ok))
         total_ct.append(len(sub))
 
-    # % AAK = GE / total contratos × 100
     pct_aak: list[float] = [
         round(q / t * 100, 1) if t > 0 else 0.0
-        for q, t in zip(qtd_ge, total_ct)
+        for q, t in zip(qtd, total_ct)
     ]
 
     labels = [nome for (_, _, nome) in meses]
 
-    # Tendência M.A — média dos últimos 3 meses completos
-    if len(qtd_ge) >= 3:
-        ma_qtd = round(sum(qtd_ge[-3:])   / 3)
-        ma_pct = round(sum(pct_aak[-3:])  / 3, 1)
-    elif qtd_ge:
-        ma_qtd = qtd_ge[-1]
-        ma_pct = pct_aak[-1]
+    if len(qtd) >= 3:
+        ma_qtd = round(sum(qtd[-3:])    / 3)
+        ma_pct = round(sum(pct_aak[-3:]) / 3, 1)
+    elif qtd:
+        ma_qtd, ma_pct = qtd[-1], pct_aak[-1]
     else:
         ma_qtd = ma_pct = 0
 
-    # label para o eixo X do gráfico (dois linhas) vs label para a tabela (sem \n)
     labels.append("TENDÊNCIA\nM.A")
-    label_tabela = [lbl.replace("\n", " ") for lbl in labels]   # sem \n no DataFrame
-    qtd_ge.append(ma_qtd)
+    label_tabela = [lbl.replace("\n", " ") for lbl in labels]
+    qtd.append(ma_qtd)
     pct_aak.append(ma_pct)
 
-    # Cores: últimos meses = azul, TENDÊNCIA M.A = laranja
     bar_colors = [_AZUL_NV] * (len(labels) - 1) + [_LARANJA_SN]
 
-    # Tabela resumo (usa label_tabela para evitar \n em nomes de coluna)
     df_tabela = pd.DataFrame({
-        "":       ["Qtd", "% AAK"],
-        **{label_tabela[i]: [qtd_ge[i], f"{pct_aak[i]:.0f}%"]
+        "": ["Qtd", "% AAK"],
+        **{label_tabela[i]: [qtd[i], f"{pct_aak[i]:.0f}%"]
            for i in range(len(label_tabela))},
     })
 
-    # Escalas dos eixos
-    y_max_qtd = max(max(qtd_ge, default=0) * 1.20, 350)
+    y_max_qtd = max(max(qtd, default=0) * 1.20, 350)
     y_max_pct = max(max(pct_aak, default=0) * 1.20, 140)
 
     fig = go.Figure()
-
-    # ── Barras (Qtd) — eixo esquerdo ─────────────────────────────────────────
     fig.add_trace(go.Bar(
         name         = "Qtd",
         x            = labels,
-        y            = qtd_ge,
+        y            = qtd,
         marker_color = bar_colors,
         yaxis        = "y",
-        # Valor em destaque apenas na barra de tendência
         text         = ["" if i < len(labels) - 1 else str(ma_qtd)
                         for i in range(len(labels))],
         textposition = "outside",
         textfont     = dict(size=12, color=_LARANJA_SN, family="Inter, sans-serif"),
-        hovertemplate= "<b>%{x}</b><br>Qtd GE: %{y}<extra></extra>",
+        hovertemplate= "<b>%{x}</b><br>Qtd: %{y}<extra></extra>",
     ))
-
-    # ── Linha % AAK — eixo direito ────────────────────────────────────────────
     fig.add_trace(go.Scatter(
         name         = "% AAK",
         x            = labels,
@@ -252,53 +245,40 @@ def _chart_garantias(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
         marker       = dict(size=6, color=_LARANJA_SN, symbol="circle"),
         hovertemplate= "<b>%{x}</b><br>% AAK: %{y:.1f}%<extra></extra>",
     ))
-
     fig.update_layout(
-        template     = "plotly_white",
-        height       = 440,
-        plot_bgcolor = "white",
-        paper_bgcolor= "white",
-        bargap       = 0.28,
-        # Eixo esquerdo — Qtd
-        yaxis = dict(
-            title    = "",
-            side     = "left",
-            dtick    = 50,
-            range    = [0, y_max_qtd],
-            showgrid = True,
-            gridcolor= "#e5e7eb",
-            zeroline = False,
-            tickfont = dict(size=11),
-        ),
-        # Eixo direito — % AAK
-        yaxis2 = dict(
-            title      = "",
-            side       = "right",
-            overlaying = "y",
-            range      = [0, y_max_pct],
-            dtick      = 20,
-            ticksuffix = "%",
-            showgrid   = False,
-            zeroline   = False,
-            tickfont   = dict(size=11),
-        ),
-        xaxis = dict(
-            showgrid = False,
-            tickfont = dict(size=11),
-        ),
-        legend = dict(
-            orientation = "h",
-            yanchor     = "bottom",
-            y           = -0.22,
-            xanchor     = "left",
-            x           = 0,
-            font        = dict(size=12),
-        ),
+        template      = "plotly_white",
+        height        = 440,
+        plot_bgcolor  = "white",
+        paper_bgcolor = "white",
+        bargap        = 0.28,
+        yaxis  = dict(title="", side="left",  dtick=20, range=[0, y_max_qtd],
+                      showgrid=True, gridcolor="#e5e7eb", zeroline=False,
+                      tickfont=dict(size=11)),
+        yaxis2 = dict(title="", side="right", overlaying="y",
+                      range=[0, y_max_pct], dtick=20,
+                      ticksuffix="%", showgrid=False, zeroline=False,
+                      tickfont=dict(size=11)),
+        xaxis  = dict(showgrid=False, tickfont=dict(size=11)),
+        legend = dict(orientation="h", yanchor="bottom", y=-0.22,
+                      xanchor="left", x=0, font=dict(size=12)),
         margin     = dict(l=20, r=50, t=20, b=70),
         hoverlabel = dict(bgcolor="white", font_size=13),
     )
-
     return fig, df_tabela
+
+
+# ─── Gráfico 2 — Garantias (Qtd + % AAK) ────────────────────────────────────
+
+def _chart_garantias(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
+    """GE produzidas — delega ao helper genérico."""
+    return _chart_produto(df, col="ge", titulo="GARANTIAS")
+
+
+# ─── Gráfico 3 — Seguros (Qtd + % AAK) ──────────────────────────────────────
+
+def _chart_seguros(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
+    """SPF (Seguro Proteção Financeira) — delega ao helper genérico."""
+    return _chart_produto(df, col="spf", titulo="SEGUROS")
 
 
 # ─── Render principal ─────────────────────────────────────────────────────────
@@ -404,5 +384,29 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                              column_config={"": st.column_config.TextColumn("", width="medium")})
     except Exception as _e_gar:
         st.error(f"❌ Erro ao renderizar GARANTIAS: {_e_gar}")
+        import traceback
+        st.code(traceback.format_exc(), language="python")
+
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Gráfico 3 — Seguros (Qtd + % AAK)
+    # ═══════════════════════════════════════════════════════════════════════════
+    try:
+        with st.container(border=True):
+            st.markdown(
+                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+                "text-align:center;margin-bottom:2px'>SEGUROS</p>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Qtd de SPF produzidos (barras, eixo esq.) · % AAK = SPF / total contratos (linha, eixo dir.)")
+
+            fig3, tbl3 = _chart_seguros(df)
+            st.plotly_chart(fig3, use_container_width=True)
+            if not tbl3.empty:
+                st.dataframe(tbl3, use_container_width=True, hide_index=True,
+                             column_config={"": st.column_config.TextColumn("", width="medium")})
+    except Exception as _e_seg:
+        st.error(f"❌ Erro ao renderizar SEGUROS: {_e_seg}")
         import traceback
         st.code(traceback.format_exc(), language="python")
