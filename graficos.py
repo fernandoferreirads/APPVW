@@ -163,12 +163,16 @@ def _chart_produto(
     df: pd.DataFrame,
     col: str,
     titulo: str,
+    filtro: str | None = None,
 ) -> tuple[go.Figure, pd.DataFrame]:
     """
     Barras azuis (Qtd, eixo esq.) + linha laranja (% AAK, eixo dir.).
     % AAK = Qtd produto / total contratos do mês × 100.
     TENDÊNCIA M.A = barra laranja (média 3 meses completos).
-    Usado por GE, SPF e qualquer produto com a mesma estrutura.
+
+    filtro: se informado, conta apenas as linhas cujo valor da coluna
+            seja igual a esse texto (case-insensitive). Ex.: "SEGURO VW".
+            Se None, conta qualquer valor não-vazio.
     """
     meses = _meses_completos(7)
 
@@ -186,8 +190,11 @@ def _chart_produto(
     for (y, m, _) in meses:
         period = pd.Period(year=y, month=m, freq="M")
         sub    = df_w[df_w["_periodo"] == period]
-        ok     = sub[col].fillna("").astype(str).str.strip()
-        ok     = ok[~ok.isin(["", "nan", "None"])]
+        vals   = sub[col].fillna("").astype(str).str.strip()
+        if filtro:
+            ok = vals[vals.str.upper() == filtro.upper()]
+        else:
+            ok = vals[~vals.isin(["", "nan", "None"])]
         qtd.append(len(ok))
         total_ct.append(len(sub))
 
@@ -277,8 +284,8 @@ def _chart_garantias(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
 # ─── Gráfico 3 — Seguros (Qtd + % AAK) ──────────────────────────────────────
 
 def _chart_seguros(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
-    """SPF (Seguro Proteção Financeira) — delega ao helper genérico."""
-    return _chart_produto(df, col="spf", titulo="SEGUROS")
+    """Seguros VW — coluna N (app, pos. 13), filtra apenas 'SEGURO VW'."""
+    return _chart_produto(df, col="app", titulo="SEGUROS", filtro="SEGURO VW")
 
 
 # ─── Render principal ─────────────────────────────────────────────────────────
