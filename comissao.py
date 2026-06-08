@@ -84,6 +84,8 @@ PRODUCT_COLS: dict[str, str] = {
 # Posições confirmadas pelo usuário:
 #   G(6)=data  M(12)=spf  N(13)=app  O(14)=gap  P(15)=franquia
 #   Q(16)=rev_plan  R(17)=ge  S(18)=protege  Y(24)=vendedor  Z(25)=retorno
+# Deduzido pelo offset +4 em relação à planilha de contratos:
+#   V(21)=tipo_veiculo (N/S)  W(22)=sempre_novo
 
 _BIGBASE_SPEC: list[tuple[str, list[str], int | None]] = [
     ("proposta",         ["PROPOSTA", "N PROPOSTA", "NUM PROPOSTA"],          0),
@@ -97,6 +99,9 @@ _BIGBASE_SPEC: list[tuple[str, list[str], int | None]] = [
     ("rev_plan",         ["REV PLAN","REV_PLAN","REVISAO","REVISÃO"],         16),
     ("ge",               ["GE","GARANTIA","GARANTIA ESTENDIDA"],              17),
     ("protege",          ["PROTEGE","VW PROTEGE"],                            18),
+    ("tipo_veiculo",     ["N/S","N / S","TIPO","TIPO VEICULO","TIPO_VEICULO",
+                          "TIPO VEI","NOVO/SEMI","NOVO / SEMI"],              21),
+    ("sempre_novo",      ["SEMPRE NV","SEMPRE NOVO","SEMPRE_NV"],             22),
     ("vendedor",         ["VENDEDOR","CONSULTOR","NOME VENDEDOR"],            24),
     ("retorno",          ["RETORNO","RETORNO3","RETORNO 3","RETORNO F&I"],    25),
     ("cliente",          ["CLIENTE","NOME CLIENTE","RAZAO SOCIAL"],          None),

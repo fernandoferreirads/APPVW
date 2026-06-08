@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import streamlit as st
 import json
 import os
 import re
 import base64
+import hashlib
 import threading
 import time as _time
 from datetime import datetime
@@ -504,9 +507,14 @@ def _get_ws_id(token: str, drive_id: str, item_id: str, sheet_name: str) -> str:
     raise Exception(f"Aba '{sheet_name}' não encontrada no arquivo Excel.")
 
 
+def _url_hash(url: str) -> str:
+    """Hash curto da URL para isolar cache por arquivo (evita conflito entre planilhas)."""
+    return hashlib.md5(url.encode()).hexdigest()[:10]
+
+
 def _get_excel_ids(token: str, sharing_url: str, aba: str) -> tuple:
-    """Retorna (drive_id, item_id, base_url) — IDs cacheados no session_state."""
-    cache_key = f"_xl_ids_{aba}"
+    """Retorna (drive_id, item_id, base_url) — IDs cacheados no session_state (por URL + aba)."""
+    cache_key = f"_xl_ids_{_url_hash(sharing_url)}_{aba}"
     cached    = st.session_state.get(cache_key)
     if cached:
         drive_id, item_id, ws_id = cached
@@ -1138,7 +1146,9 @@ with st.popover("⚙️  Configurações"):
     if not excel_ok and _auth_st not in ("pending", "checking", "authenticated"):
         st.caption("💡 Preencha o Client ID, o link do Excel e faça login para inserir dados.")
 
-_tab_c, _tab_d, _tab_com = st.tabs(["📋  Contratos", "📊  Dashboard", "💰  Comissão"])
+_tab_c, _tab_d, _tab_com, _tab_graf = st.tabs([
+    "📋  Contratos", "📊  Dashboard", "💰  Comissão", "📈  Gráficos",
+])
 
 with _tab_c:
     st.markdown("""
@@ -1524,3 +1534,7 @@ with _tab_d:
 with _tab_com:
     from comissao import render_comissao as _render_comm
     _render_comm(az_client_id, dash_url)
+
+with _tab_graf:
+    from graficos import render_graficos as _render_graf
+    _render_graf(az_client_id, dash_url)
