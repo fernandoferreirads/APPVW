@@ -288,6 +288,124 @@ def _chart_seguros(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     return _chart_produto(df, col="app", titulo="SEGUROS", filtro="SEGURO VW")
 
 
+# ─── Gráfico 4 — SPF (barras agrupadas Total vs Plus) ────────────────────────
+
+def _chart_spf(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
+    """
+    Barras agrupadas: Total SPF (azul) vs SPF Plus (laranja).
+    Coluna M (spf, pos. 12).
+    Total SPF = qualquer valor não-vazio; SPF Plus = contém 'PLUS'.
+    Tabela com 4 linhas: Total Spfs, Spf Plus, % AAK, Aak Plus.
+    """
+    meses = _meses_completos(7)
+
+    if "spf" not in df.columns or "data_pagto" not in df.columns:
+        return _fig_sem_dados(
+            "Coluna 'spf' ou 'data_pagto' não encontrada no BIGBASE"
+        ), pd.DataFrame()
+
+    df_w = df.copy()
+    df_w["_periodo"] = df_w["data_pagto"].dt.to_period("M")
+
+    total_spf: list[int] = []
+    spf_plus:  list[int] = []
+    total_ct:  list[int] = []
+
+    for (y, m, _) in meses:
+        period = pd.Period(year=y, month=m, freq="M")
+        sub    = df_w[df_w["_periodo"] == period]
+        vals   = sub["spf"].fillna("").astype(str).str.strip()
+
+        nao_vazio = vals[~vals.isin(["", "nan", "None"])]
+        total_spf.append(len(nao_vazio))
+
+        plus = vals[vals.str.contains("PLUS", case=False, na=False, regex=False)]
+        spf_plus.append(len(plus))
+
+        total_ct.append(len(sub))
+
+    pct_aak  = [round(q / t * 100, 1) if t > 0 else 0.0
+                for q, t in zip(total_spf, total_ct)]
+    pct_plus = [round(q / t * 100, 1) if t > 0 else 0.0
+                for q, t in zip(spf_plus,  total_ct)]
+
+    labels = [nome for (_, _, nome) in meses]
+
+    # Tendência M.A (média 3 meses completos)
+    if len(total_spf) >= 3:
+        ma_total = round(sum(total_spf[-3:]) / 3)
+        ma_plus  = round(sum(spf_plus[-3:])  / 3)
+        ma_pct   = round(sum(pct_aak[-3:])   / 3, 1)
+        ma_pct_p = round(sum(pct_plus[-3:])  / 3, 1)
+    elif total_spf:
+        ma_total, ma_plus   = total_spf[-1], spf_plus[-1]
+        ma_pct,   ma_pct_p  = pct_aak[-1],  pct_plus[-1]
+    else:
+        ma_total = ma_plus = ma_pct = ma_pct_p = 0
+
+    labels.append("TENDÊNCIA\nM.A")
+    label_tabela = [lbl.replace("\n", " ") for lbl in labels]
+    total_spf.append(ma_total)
+    spf_plus.append(ma_plus)
+    pct_aak.append(ma_pct)
+    pct_plus.append(ma_pct_p)
+
+    df_tabela = pd.DataFrame({
+        "": ["Total Spfs", "Spf Plus", "% AAK", "Aak Plus"],
+        **{label_tabela[i]: [
+            total_spf[i],
+            spf_plus[i],
+            f"{pct_aak[i]:.0f}%",
+            f"{pct_plus[i]:.0f}%",
+        ] for i in range(len(label_tabela))},
+    })
+
+    y_max = max(max(total_spf, default=0) * 1.35, 60)
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Bar(
+        name         = "Total Spfs",
+        x            = labels,
+        y            = total_spf,
+        marker_color = _AZUL_NV,
+        text         = [str(v) if v > 0 else "" for v in total_spf],
+        textposition = "outside",
+        textfont     = dict(size=11, color="#1a1a2e"),
+        hovertemplate= "<b>%{x}</b><br>Total Spfs: %{y}<extra></extra>",
+    ))
+
+    fig.add_trace(go.Bar(
+        name         = "Spf Plus",
+        x            = labels,
+        y            = spf_plus,
+        marker_color = _LARANJA_SN,
+        text         = [str(v) if v > 0 else "" for v in spf_plus],
+        textposition = "outside",
+        textfont     = dict(size=11, color="#1a1a2e"),
+        hovertemplate= "<b>%{x}</b><br>Spf Plus: %{y}<extra></extra>",
+    ))
+
+    fig.update_layout(
+        barmode       = "group",
+        template      = "plotly_white",
+        height        = 440,
+        plot_bgcolor  = "white",
+        paper_bgcolor = "white",
+        bargap        = 0.25,
+        bargroupgap   = 0.05,
+        yaxis  = dict(range=[0, y_max], showgrid=True, gridcolor="#e5e7eb",
+                      zeroline=False, tickfont=dict(size=11)),
+        xaxis  = dict(showgrid=False, tickfont=dict(size=11)),
+        legend = dict(orientation="h", yanchor="bottom", y=-0.22,
+                      xanchor="left", x=0, font=dict(size=12)),
+        margin     = dict(l=20, r=20, t=20, b=70),
+        hoverlabel = dict(bgcolor="white", font_size=13),
+    )
+
+    return fig, df_tabela
+
+
 # ─── Render principal ─────────────────────────────────────────────────────────
 
 def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
@@ -415,5 +533,29 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                              column_config={"": st.column_config.TextColumn("", width="medium")})
     except Exception as _e_seg:
         st.error(f"❌ Erro ao renderizar SEGUROS: {_e_seg}")
+        import traceback
+        st.code(traceback.format_exc(), language="python")
+
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Gráfico 4 — SPF (barras agrupadas Total vs Plus)
+    # ═══════════════════════════════════════════════════════════════════════════
+    try:
+        with st.container(border=True):
+            st.markdown(
+                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+                "text-align:center;margin-bottom:2px'>SPF</p>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Total SPF (azul) vs SPF Plus (laranja) · % AAK = Qtd / total contratos")
+
+            fig4, tbl4 = _chart_spf(df)
+            st.plotly_chart(fig4, use_container_width=True)
+            if not tbl4.empty:
+                st.dataframe(tbl4, use_container_width=True, hide_index=True,
+                             column_config={"": st.column_config.TextColumn("", width="medium")})
+    except Exception as _e_spf:
+        st.error(f"❌ Erro ao renderizar SPF: {_e_spf}")
         import traceback
         st.code(traceback.format_exc(), language="python")
