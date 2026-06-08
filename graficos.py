@@ -226,7 +226,7 @@ def _chart_produto(
            for i in range(len(label_tabela))},
     })
 
-    y_max_qtd = max(max(qtd, default=0) * 1.20, 350)
+    y_max_qtd = max(max(qtd, default=0) * 1.20, 200)
     y_max_pct = max(max(pct_aak, default=0) * 1.20, 140)
 
     fig = go.Figure()
