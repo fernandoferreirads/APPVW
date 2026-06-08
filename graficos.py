@@ -61,6 +61,21 @@ def _chart_contratos_nv_sn(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     meses = _meses_range(6)
     hoje  = _periodo_atual()
 
+    # Coluna tipo_veiculo pode não existir se BIGBASE ainda não foi recarregado
+    if "tipo_veiculo" not in df.columns:
+        fig_vazio = go.Figure()
+        fig_vazio.add_annotation(
+            text="Coluna tipo_veiculo não encontrada — clique em 🔄 para recarregar o BIGBASE",
+            xref="paper", yref="paper", x=0.5, y=0.5,
+            showarrow=False,
+            font=dict(size=14, color="#6b7280"),
+        )
+        fig_vazio.update_layout(
+            template="plotly_white", height=300,
+            xaxis=dict(visible=False), yaxis=dict(visible=False),
+        )
+        return fig_vazio, pd.DataFrame()
+
     # Filtra apenas N e S (ignora vazio, 0, etc.)
     df_tipo = df[
         df["tipo_veiculo"].fillna("").str.strip().str.upper().isin(["N", "S"])
@@ -229,11 +244,11 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
             st.session_state.pop("_comm_ts_bigbase", None)
             st.rerun()
 
-    # Aviso se tipo_veiculo não foi encontrado
+    # Aviso se tipo_veiculo não foi encontrado — provavelmente cache desatualizado
     if "tipo_veiculo" not in df.columns or df["tipo_veiculo"].isna().all():
         st.warning(
-            "⚠️ Coluna **tipo_veiculo** (N/S) não encontrada no BIGBASE. "
-            "Verifique se o cabeçalho da coluna V (posição 21) contém 'N/S' ou 'TIPO'."
+            "⚠️ Coluna **tipo_veiculo** não encontrada no BIGBASE carregado. "
+            "Se você acabou de renomear a coluna no Excel, clique em **🔄** acima para recarregar."
         )
 
     st.divider()
