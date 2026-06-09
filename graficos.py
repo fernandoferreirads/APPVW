@@ -1170,6 +1170,10 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
     # ═══════════════════════════════════════════════════════════════════════════
     # Gráfico 8 — Pontos por Contrato
     # ═══════════════════════════════════════════════════════════════════════════
+    # marcador externo — aparece independentemente de exceção
+    _ppc_cols = [c for c in df.columns if "ponto" in c.lower() or "retorno" in c.lower()]
+    st.caption(f"🔍 PPC debug — colunas: {_ppc_cols}")
+    import traceback as _tb8
     try:
         with st.container(border=True):
             st.markdown(
@@ -1177,17 +1181,16 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                 "text-align:center;margin-bottom:2px'>PONTOS POR CONTRATO</p>",
                 unsafe_allow_html=True,
             )
-            st.caption("Média de pontos por contrato (barras) · META = 1,5 (linha laranja)")
+            st.caption("Media de pontos por contrato (barras) · META = 1,5 (linha laranja)")
 
             fig8, tbl8 = _chart_pontos_por_contrato(df)
             st.plotly_chart(fig8, use_container_width=True)
             if not tbl8.empty:
                 st.dataframe(tbl8, use_container_width=True, hide_index=True,
                              column_config={"": st.column_config.TextColumn("", width="medium")})
-    except Exception as _e_ppc:
-        st.error(f"❌ Erro ao renderizar PONTOS POR CONTRATO: {_e_ppc}")
-        import traceback
-        st.code(traceback.format_exc(), language="python")
+    except BaseException as _e_ppc:
+        st.error(f"❌ Erro PPC [{type(_e_ppc).__name__}]: {_e_ppc}")
+        st.code(_tb8.format_exc(), language="python")
 
     st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
 
