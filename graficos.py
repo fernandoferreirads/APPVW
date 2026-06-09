@@ -1259,14 +1259,16 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
     # ═══════════════════════════════════════════════════════════════════════════
     # Gráfico 5b — Sempre Novo (Qtd + % AAk vs AAK)
     # ═══════════════════════════════════════════════════════════════════════════
+    # Marcador externo — aparece mesmo que o container interno falhe
+    st.markdown(
+        "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+        "text-align:center;margin-bottom:2px'>SEMPRE NOVO</p>",
+        unsafe_allow_html=True,
+    )
     try:
         with st.container(border=True):
-            st.markdown(
-                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
-                "text-align:center;margin-bottom:2px'>SEMPRE NOVO</p>",
-                unsafe_allow_html=True,
-            )
             st.caption("Qtd de Sempre Novo produzidos (barras, eixo esq.) · % AAk = Qtd / AAK do mês (linha, eixo dir.)")
+            st.caption(f"DEBUG colunas: {[c for c in df.columns if 'sempre' in c.lower() or 'novo' in c.lower()]}")
 
             fig5b, tbl5b = _chart_sempre_novo(df, aak_manual=_aak_load())
             st.plotly_chart(fig5b, use_container_width=True)
