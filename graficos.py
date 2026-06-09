@@ -872,25 +872,25 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
     # ═══════════════════════════════════════════════════════════════════════════
     # Gráfico 7 — Contratos + AAK
     # ═══════════════════════════════════════════════════════════════════════════
-    try:
-        with st.container(border=True):
-            st.markdown(
-                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
-                "text-align:center;margin-bottom:2px'>CONTRATOS E AAK</p>",
-                unsafe_allow_html=True,
-            )
-            st.caption("Contratos NV + SN (barras, eixo esq.) · AAK = entrada manual por mês (linha, eixo dir.)")
+    with st.container(border=True):
+        st.markdown(
+            "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+            "text-align:center;margin-bottom:2px'>CONTRATOS E AAK</p>",
+            unsafe_allow_html=True,
+        )
+        st.caption("Contratos NV + SN (barras, eixo esq.) · AAK = entrada manual por mês (linha, eixo dir.)")
 
-            # ── Entrada manual de AAK ─────────────────────────────────────────
+        # ── Entrada manual de AAK (bloco isolado) ─────────────────────────────
+        _aak_atual: dict[str, int] = {}
+        try:
             _meses_aak = _meses_range(6)
             _aak_atual = _aak_load()
-
             with st.expander("✏️ Valores AAK — entrada manual"):
                 _df_aak = pd.DataFrame({
-                    "Mês":     [nome for (_, _, nome) in _meses_aak],
-                    "_periodo":[f"{y:04d}-{m:02d}" for (y, m, _) in _meses_aak],
-                    "AAK":     [_aak_atual.get(f"{y:04d}-{m:02d}", 0)
-                                for (y, m, _) in _meses_aak],
+                    "Mês":      [nome for (_, _, nome) in _meses_aak],
+                    "_periodo": [f"{y:04d}-{m:02d}" for (y, m, _) in _meses_aak],
+                    "AAK":      [int(_aak_atual.get(f"{y:04d}-{m:02d}", 0))
+                                 for (y, m, _) in _meses_aak],
                 })
                 _editado = st.data_editor(
                     _df_aak[["Mês", "AAK"]],
@@ -899,7 +899,9 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                     hide_index=True,
                     key="aak_editor",
                     column_config={
-                        "AAK": st.column_config.NumberColumn("AAK", min_value=0, step=1),
+                        "AAK": st.column_config.NumberColumn(
+                            "AAK", min_value=0, step=1, format="%d"
+                        ),
                     },
                 )
                 if st.button("💾 Salvar AAK", key="btn_salvar_aak"):
@@ -911,13 +913,19 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                     _aak_save(_aak_atual)
                     st.success("✅ AAK salvo com sucesso!")
                     st.rerun()
+        except Exception as _e_exp:
+            import traceback as _tb
+            st.warning(f"⚠️ Expander AAK: {_e_exp}")
+            st.code(_tb.format_exc(), language="python")
 
+        # ── Gráfico e tabela ──────────────────────────────────────────────────
+        try:
             fig7, tbl7 = _chart_contratos_aak(df, aak_manual=_aak_atual)
             st.plotly_chart(fig7, use_container_width=True)
             if not tbl7.empty:
                 st.dataframe(tbl7, use_container_width=True, hide_index=True,
                              column_config={"": st.column_config.TextColumn("", width="medium")})
-    except Exception as _e_aak:
-        st.error(f"❌ Erro ao renderizar CONTRATOS E AAK: {_e_aak}")
-        import traceback
-        st.code(traceback.format_exc(), language="python")
+        except Exception as _e_aak:
+            import traceback as _tb
+            st.error(f"❌ Erro ao renderizar CONTRATOS E AAK: {_e_aak}")
+            st.code(_tb.format_exc(), language="python")
