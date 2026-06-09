@@ -691,6 +691,139 @@ def _chart_spf(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     return fig, df_tabela
 
 
+# ─── Exportação PDF ───────────────────────────────────────────────────────────
+
+def _gerar_pdf(df: pd.DataFrame, aak_manual: dict) -> bytes:
+    """
+    Gera um PDF landscape A4 com os 7 gráficos F&I.
+    Requer: kaleido (renderiza imagens) + reportlab (monta o PDF).
+    """
+    import io as _io
+
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import cm
+    from reportlab.platypus import (
+        Image as RLImage,
+        PageBreak,
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+        Table,
+        TableStyle,
+    )
+
+    PAGE = landscape(A4)          # 841.9 × 595.3 pt
+    LM = RM = 1.4 * cm
+    TM = BM = 1.6 * cm
+    CW = PAGE[0] - LM - RM        # largura do conteúdo ≈ 792 pt
+
+    buf = _io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=PAGE,
+        leftMargin=LM, rightMargin=RM,
+        topMargin=TM, bottomMargin=BM,
+    )
+
+    styles  = getSampleStyleSheet()
+    h_style = ParagraphStyle(
+        "TituloGraf",
+        parent=styles["Heading2"],
+        fontSize=12,
+        textColor=colors.HexColor("#001e50"),
+        spaceBefore=0,
+        spaceAfter=4,
+    )
+
+    # ── Coleta todas as figuras ───────────────────────────────────────────────
+    graficos = [
+        ("CONTRATOS NV vs SN", _chart_contratos_nv_sn(df)),
+        ("GARANTIAS",          _chart_garantias(df)),
+        ("SEGUROS",            _chart_seguros(df)),
+        ("SPF",                _chart_spf(df)),
+        ("PROTEGE",            _chart_protege(df)),
+        ("TOTAL PONTOS",       _chart_pontos(df)),
+        ("CONTRATOS E AAK",    _chart_contratos_aak(df, aak_manual=aak_manual or {})),
+    ]
+
+    story = []
+
+    # ── Capa ──────────────────────────────────────────────────────────────────
+    story.append(Spacer(1, 4.5 * cm))
+    story.append(Paragraph(
+        "Graficos F&amp;I - Banco Volkswagen CCB",
+        ParagraphStyle(
+            "Capa", parent=styles["Title"],
+            fontSize=22, textColor=colors.HexColor("#001e50"), alignment=1,
+        ),
+    ))
+    story.append(Spacer(1, 0.6 * cm))
+    story.append(Paragraph(
+        f"Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+        ParagraphStyle(
+            "DataCapa", parent=styles["Normal"],
+            fontSize=11, textColor=colors.grey, alignment=1,
+        ),
+    ))
+    story.append(PageBreak())
+
+    IMG_H = CW * 420 / 1200   # altura mantendo aspect-ratio 1200×420
+
+    for titulo, (fig, tbl) in graficos:
+        story.append(Paragraph(titulo, h_style))
+
+        # Renderiza o gráfico como PNG via kaleido
+        try:
+            img_bytes = fig.to_image(format="png", width=1200, height=420, scale=2)
+            story.append(RLImage(_io.BytesIO(img_bytes), width=CW, height=IMG_H))
+        except Exception as _img_e:
+            story.append(
+                Paragraph(f"[imagem indisponivel: {_img_e}]", styles["Normal"])
+            )
+
+        story.append(Spacer(1, 0.2 * cm))
+
+        # Tabela de dados abaixo do gráfico
+        if not tbl.empty:
+            cols = list(tbl.columns)
+            rows = []
+            for row in tbl.itertuples(index=False, name=None):
+                rows.append([
+                    "" if str(v) in ("<NA>", "nan", "None") else str(v)
+                    for v in row
+                ])
+
+            n      = len(cols)
+            first  = 2.6 * cm
+            rest   = (CW - first) / (n - 1) if n > 1 else CW
+            col_ws = [first] + [rest] * (n - 1)
+
+            t_rl = Table([cols] + rows, colWidths=col_ws, repeatRows=1)
+            ts_rl = TableStyle([
+                ("BACKGROUND",    (0, 0), (-1, 0),  colors.HexColor("#001e50")),
+                ("TEXTCOLOR",     (0, 0), (-1, 0),  colors.white),
+                ("FONTNAME",      (0, 0), (-1, 0),  "Helvetica-Bold"),
+                ("FONTSIZE",      (0, 0), (-1, -1), 7),
+                ("ALIGN",         (1, 0), (-1, -1), "CENTER"),
+                ("ALIGN",         (0, 0), (0, -1),  "LEFT"),
+                ("GRID",          (0, 0), (-1, -1), 0.4, colors.HexColor("#d1d5db")),
+                ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING",    (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ])
+            for i in range(1, len(rows) + 1):
+                bg = colors.white if i % 2 == 1 else colors.HexColor("#f3f4f6")
+                ts_rl.add("BACKGROUND", (0, i), (-1, i), bg)
+            t_rl.setStyle(ts_rl)
+            story.append(t_rl)
+
+        story.append(PageBreak())
+
+    doc.build(story)
+    return buf.getvalue()
+
+
 # ─── Render principal ─────────────────────────────────────────────────────────
 
 def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
@@ -746,6 +879,7 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
         if st.button("🔄", key="graf_reload", help="Recarregar BIGBASE"):
             st.session_state.pop("_comm_df_bigbase", None)
             st.session_state.pop("_comm_ts_bigbase", None)
+            st.session_state.pop("_pdf_bytes", None)   # invalida PDF em cache
             st.rerun()
 
     if "tipo_veiculo" not in df.columns or df["tipo_veiculo"].isna().all():
@@ -755,6 +889,30 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
         )
 
     st.divider()
+
+    # ── Exportar todos os gráficos em PDF ─────────────────────────────────────
+    _pdf_col1, _pdf_col2, _ = st.columns([1.3, 1.5, 7])
+    with _pdf_col1:
+        if st.button("📄 Gerar PDF", key="btn_gerar_pdf", use_container_width=True):
+            with st.spinner("Gerando PDF... aguarde"):
+                try:
+                    st.session_state["_pdf_bytes"] = _gerar_pdf(df, _aak_load())
+                except Exception as _e_pdf:
+                    st.error(f"❌ Erro ao gerar PDF: {_e_pdf}")
+                    import traceback as _tb_pdf
+                    st.code(_tb_pdf.format_exc(), language="python")
+    with _pdf_col2:
+        if st.session_state.get("_pdf_bytes"):
+            st.download_button(
+                "📥 Baixar PDF",
+                data=st.session_state["_pdf_bytes"],
+                file_name=f"graficos_fi_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                mime="application/pdf",
+                key="btn_dl_pdf",
+                use_container_width=True,
+            )
+
+    st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════════════════════════════
     # Gráfico 1 — Contratos NV vs SN
