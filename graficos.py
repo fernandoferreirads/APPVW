@@ -573,6 +573,106 @@ def _chart_pontos(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     return fig, df_tabela
 
 
+# ─── Gráfico 8 — Pontos por Contrato ────────────────────────────────────────
+
+_META_PPC = 1.5   # meta fixa pontos por contrato
+
+def _chart_pontos_por_contrato(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
+    """
+    PONTOS POR CONTRATO = sum(pontos) / (NV + SN) por mês.
+    Barras azuis (MÉDIA) + barra laranja (TENDÊNCIA M.A) + linha laranja (META = 1.5).
+    """
+    meses = _meses_completos(7)
+
+    cols_req = {"pontos", "tipo_veiculo", "data_pagto"}
+    if not cols_req.issubset(df.columns):
+        return _fig_sem_dados(
+            "Colunas necessárias (pontos, tipo_veiculo, data_pagto) não encontradas"
+        ), pd.DataFrame()
+
+    df_w = df.copy()
+    df_w["_periodo"]    = df_w["data_pagto"].dt.to_period("M")
+    df_w["_pontos_num"] = pd.to_numeric(df_w["pontos"], errors="coerce").fillna(0.0)
+
+    medias: list[float] = []
+
+    for (y, m, _) in meses:
+        period = pd.Period(year=y, month=m, freq="M")
+        sub    = df_w[df_w["_periodo"] == period]
+        total_pontos = float(sub["_pontos_num"].sum())
+        tv = sub["tipo_veiculo"].astype(str).str.upper()
+        tt = len(tv[tv.str.startswith("N", na=False)]) + len(tv[tv.str.startswith("S", na=False)])
+        medias.append(round(total_pontos / tt, 2) if tt > 0 else 0.0)
+
+    labels = [nome for (_, _, nome) in meses]
+
+    # Tendência M.A — média dos últimos 3 meses completos
+    tend = round(sum(medias[-3:]) / 3, 2) if len(medias) >= 3 else (medias[-1] if medias else 0.0)
+
+    labels.append("TENDÊNCIA\nM.A")
+    label_tabela = [lbl.replace("\n", " ") for lbl in labels]
+    medias.append(tend)
+
+    bar_colors = [_AZUL_NV] * (len(labels) - 1) + [_LARANJA_SN]
+    y_max = max(max(medias, default=0) * 1.18, _META_PPC * 1.5)
+
+    fig = go.Figure()
+
+    # Barras MÉDIA
+    fig.add_trace(go.Bar(
+        name          = "MÉDIA",
+        x             = labels,
+        y             = medias,
+        marker_color  = bar_colors,
+        text          = [f"{v:.2f}" for v in medias],
+        textposition  = "outside",
+        textfont      = dict(size=11, color="#1a1a2e"),
+        hovertemplate = "<b>%{x}</b><br>Pontos/Contrato: %{text}<extra></extra>",
+    ))
+
+    # Linha horizontal META
+    fig.add_trace(go.Scatter(
+        name          = "META",
+        x             = labels,
+        y             = [_META_PPC] * len(labels),
+        mode          = "lines",
+        line          = dict(color=_LARANJA_SN, width=2.5),
+        hovertemplate = "META: %{y:.1f}<extra></extra>",
+    ))
+
+    fig.update_layout(
+        template      = "plotly_white",
+        height        = 440,
+        plot_bgcolor  = "white",
+        paper_bgcolor = "white",
+        bargap        = 0.28,
+        yaxis = dict(
+            dtick      = 0.20,
+            range      = [0, y_max],
+            showgrid   = True,
+            gridcolor  = "#e5e7eb",
+            zeroline   = False,
+            tickformat = ".2f",
+            tickfont   = dict(size=11),
+        ),
+        xaxis  = dict(showgrid=False, tickfont=dict(size=11)),
+        legend = dict(orientation="h", yanchor="bottom", y=-0.22,
+                      xanchor="left", x=0, font=dict(size=12)),
+        margin     = dict(l=20, r=20, t=20, b=70),
+        hoverlabel = dict(bgcolor="white", font_size=13),
+    )
+
+    df_tabela = _str_df(pd.DataFrame({
+        "": ["MÉDIA", "META"],
+        **{label_tabela[i]: [
+            f"{medias[i]:.2f}",
+            f"{_META_PPC:.1f}",
+        ] for i in range(len(label_tabela))},
+    }))
+
+    return fig, df_tabela
+
+
 # ─── Gráfico 4 — SPF (barras agrupadas Total vs Plus) ────────────────────────
 
 def _chart_spf(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
@@ -756,8 +856,9 @@ def _gerar_pdf(df: pd.DataFrame, aak_manual: dict) -> bytes:
         ("SEGUROS",            _chart_seguros(df)),
         ("SPF",                _chart_spf(df)),
         ("PROTEGE",            _chart_protege(df)),
-        ("TOTAL PONTOS",       _chart_pontos(df)),
-        ("CONTRATOS E AAK",    _chart_contratos_aak(df, aak_manual=aak_manual or {})),
+        ("TOTAL PONTOS",          _chart_pontos(df)),
+        ("PONTOS POR CONTRATO",   _chart_pontos_por_contrato(df)),
+        ("CONTRATOS E AAK",       _chart_contratos_aak(df, aak_manual=aak_manual or {})),
     ]
 
     story = []
@@ -1061,6 +1162,30 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                              column_config={"": st.column_config.TextColumn("", width="medium")})
     except Exception as _e_pts:
         st.error(f"❌ Erro ao renderizar TOTAL PONTOS: {_e_pts}")
+        import traceback
+        st.code(traceback.format_exc(), language="python")
+
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Gráfico 8 — Pontos por Contrato
+    # ═══════════════════════════════════════════════════════════════════════════
+    try:
+        with st.container(border=True):
+            st.markdown(
+                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+                "text-align:center;margin-bottom:2px'>PONTOS POR CONTRATO</p>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Média de pontos por contrato (barras) · META = 1,5 (linha laranja)")
+
+            fig8, tbl8 = _chart_pontos_por_contrato(df)
+            st.plotly_chart(fig8, use_container_width=True)
+            if not tbl8.empty:
+                st.dataframe(tbl8, use_container_width=True, hide_index=True,
+                             column_config={"": st.column_config.TextColumn("", width="medium")})
+    except Exception as _e_ppc:
+        st.error(f"❌ Erro ao renderizar PONTOS POR CONTRATO: {_e_ppc}")
         import traceback
         st.code(traceback.format_exc(), language="python")
 
