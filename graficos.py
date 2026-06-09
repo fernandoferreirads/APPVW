@@ -19,8 +19,19 @@ import streamlit as st
 
 from comissao import load_bigbase
 
-# ─── Caminho do arquivo de persistência AAK ───────────────────────────────────
+# ─── Persistência AAK ────────────────────────────────────────────────────────
 _AAK_FILE = Path(__file__).parent / "credentials" / "aak_data.json"
+
+# Valores históricos consolidados (base fixa — sobrescritos por entradas manuais)
+_AAK_DEFAULTS: dict[str, int] = {
+    "2025-10": 192,
+    "2025-11": 186,
+    "2025-12": 181,
+    "2026-01": 207,
+    "2026-02": 195,
+    "2026-03": 231,
+    "2026-04": 214,
+}
 
 # ─── Paleta fiel ao Excel ──────────────────────────────────────────────────────
 _AZUL_NV    = "#4472C4"   # azul Excel (barras principais)
@@ -73,13 +84,18 @@ def _str_df(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _aak_load() -> dict[str, int]:
-    """Lê credentials/aak_data.json → {YYYY-MM: int}. Retorna {} se não existir."""
+    """
+    Carrega AAK: começa com _AAK_DEFAULTS (histórico fixo) e sobrepõe
+    com os valores salvos em aak_data.json (entradas manuais do usuário).
+    """
+    data = dict(_AAK_DEFAULTS)
     try:
         if _AAK_FILE.exists():
-            return {k: int(v) for k, v in json.loads(_AAK_FILE.read_text()).items()}
+            saved = {k: int(v) for k, v in json.loads(_AAK_FILE.read_text()).items()}
+            data.update(saved)
     except Exception:
         pass
-    return {}
+    return data
 
 
 def _aak_save(data: dict[str, int]) -> None:
@@ -184,22 +200,24 @@ def _chart_contratos_nv_sn(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     return fig, df_tabela
 
 
-# ─── Gráfico 7 — Contratos + AAK (barras empilhadas + linha AAK) ─────────────
+# ─── Gráfico 7 — Contratos + AAK ─────────────────────────────────────────────
+
+# Número de meses exibidos no gráfico (completos + mês vigente)
+_AAK_N_MESES = 9   # 8 completos + mês atual → abrange ~out/25 – jun/26
 
 def _chart_contratos_aak(
     df: pd.DataFrame,
     aak_manual: dict[str, int] | None = None,
 ) -> tuple[go.Figure, pd.DataFrame]:
     """
-    Barras empilhadas: CONTRATOS NV (azul) + CONTRATOS SN (laranja).
-    Linha verde: AAK por mês (manual se disponível, senão soma produtos BIGBASE).
-    Tabela: CONTRATOS TT | AAK | PENETRATION (NV / AAK × 100).
-    aak_manual: {YYYY-MM: int} carregado de credentials/aak_data.json.
+    Barra azul  : CONTRATOS TT (eixo esq.)
+    Linha laranja: AAK por mês  (eixo esq., mesmo range das barras)
+    Linha verde  : PENETRATION = NV / AAK × 100 (eixo dir., %)
+    Tendência M.A: barra laranja + pontos para as linhas.
+    aak_manual  : {YYYY-MM: int} carregado de credentials/aak_data.json.
     """
-    meses = _meses_range(6)     # 5 meses completos + mês vigente
+    meses = _meses_range(_AAK_N_MESES)
     hoje  = _periodo_atual()
-
-    _PROD_COLS = ["spf", "app", "gap", "franquia", "ge", "protege"]
 
     if "tipo_veiculo" not in df.columns or "data_pagto" not in df.columns:
         return _fig_sem_dados(
@@ -210,7 +228,6 @@ def _chart_contratos_aak(
     df_w["_periodo"] = df_w["data_pagto"].dt.to_period("M")
 
     nv_vals:  list[int] = []
-    sn_vals:  list[int] = []
     tt_vals:  list[int] = []
     aak_vals: list[int] = []
 
@@ -221,39 +238,32 @@ def _chart_contratos_aak(
         tv         = sub["tipo_veiculo"].fillna("").str.strip().str.upper()
 
         nv_vals.append(int((tv == "N").sum()))
-        sn_vals.append(int((tv == "S").sum()))
         tt_vals.append(len(sub))
 
-        # AAK: usa valor manual se disponível, senão calcula da BIGBASE
         if aak_manual and period_str in aak_manual:
             aak_vals.append(int(aak_manual[period_str]))
         else:
-            aak = 0
-            for col in _PROD_COLS:
-                if col in df_w.columns:
-                    v = sub[col].fillna("").astype(str).str.strip()
-                    aak += len(v[~v.isin(["", "nan", "None"])])
-            aak_vals.append(aak)
+            aak_vals.append(0)   # sem valor manual → zero (sinaliza dado faltante)
 
     labels = [nome for (_, _, nome) in meses]
 
-    # Tendência M.A — média dos 3 últimos meses COMPLETOS
+    # ── Tendência M.A — média dos 3 últimos meses COMPLETOS ──────────────────
     idx_comp = [i for i, (y, m, _) in enumerate(meses)
                 if pd.Period(year=y, month=m, freq="M") < hoje]
     if idx_comp:
         ult3   = idx_comp[-3:]
-        ma_nv  = round(sum(nv_vals[i]  for i in ult3) / len(ult3))
-        ma_sn  = round(sum(sn_vals[i]  for i in ult3) / len(ult3))
         ma_tt  = round(sum(tt_vals[i]  for i in ult3) / len(ult3))
+        ma_nv  = round(sum(nv_vals[i]  for i in ult3) / len(ult3))
         ma_aak = round(sum(aak_vals[i] for i in ult3) / len(ult3))
     else:
-        ma_nv = ma_sn = ma_tt = ma_aak = 0
+        ma_tt = ma_nv = ma_aak = 0
 
-    labels.append("TENDÊNCIA M.A")
-    nv_vals.append(ma_nv)
-    sn_vals.append(ma_sn)
+    labels.append("TENDÊNCIA\nM.A")
     tt_vals.append(ma_tt)
+    nv_vals.append(ma_nv)
     aak_vals.append(ma_aak)
+
+    label_tabela = [lbl.replace("\n", " ") for lbl in labels]
 
     # PENETRATION = NV / AAK × 100
     penet: list[float] = [
@@ -263,62 +273,78 @@ def _chart_contratos_aak(
 
     df_tabela = _str_df(pd.DataFrame({
         "": ["CONTRATOS TT", "AAK", "PENETRATION"],
-        **{labels[i]: [
+        **{label_tabela[i]: [
             str(tt_vals[i]),
             str(aak_vals[i]),
             f"{penet[i]:.0f}%",
-        ] for i in range(len(labels))},
+        ] for i in range(len(label_tabela))},
     }))
 
-    total_vals  = [nv + sn for nv, sn in zip(nv_vals, sn_vals)]
-    y_max_bars  = max(max(total_vals, default=0) * 1.20, 300)
-    y_max_line  = max(max(aak_vals,   default=0) * 1.30, 300)
+    # ── Escalas ──────────────────────────────────────────────────────────────
+    y_max = max(
+        max(tt_vals,  default=0),
+        max(aak_vals, default=0),
+    ) * 1.30
+    y_max = max(y_max, 300)
+
+    penet_max = max(max(penet, default=0) * 1.30, 130)
+
+    # ── Cores: tendência = laranja, resto = azul ──────────────────────────────
+    bar_colors = [_AZUL_NV] * (len(labels) - 1) + [_LARANJA_SN]
 
     fig = go.Figure()
 
-    # ── Barras empilhadas ─────────────────────────────────────────────────────
+    # Barras CONTRATOS TT
     fig.add_trace(go.Bar(
-        name="CONTRATOS NV", x=labels, y=nv_vals, yaxis="y",
-        marker_color=_AZUL_NV,
-        text=[str(v) if v > 0 else "" for v in nv_vals],
-        textposition="inside", insidetextanchor="middle",
-        textfont=dict(color="white", size=11),
-        hovertemplate="<b>%{x}</b><br>NV: %{y}<extra></extra>",
-    ))
-    fig.add_trace(go.Bar(
-        name="CONTRATOS SN", x=labels, y=sn_vals, yaxis="y",
-        marker_color=_LARANJA_SN,
-        text=[str(v) if v > 0 else "" for v in sn_vals],
-        textposition="inside", insidetextanchor="middle",
-        textfont=dict(color="white", size=11),
-        hovertemplate="<b>%{x}</b><br>SN: %{y}<extra></extra>",
+        name="CONTRATOS TT", x=labels, y=tt_vals, yaxis="y",
+        marker_color=bar_colors,
+        text=[str(v) if v > 0 else "" for v in tt_vals],
+        textposition="outside",
+        textfont=dict(size=10, color="#222"),
+        hovertemplate="<b>%{x}</b><br>TT: %{y}<extra></extra>",
     ))
 
-    # ── Linha AAK (eixo direito) ───────────────────────────────────────────────
+    # Linha AAK (eixo esquerdo — mesma escala das barras)
     fig.add_trace(go.Scatter(
-        name="AAK", x=labels, y=aak_vals, yaxis="y2",
-        mode="lines+markers",
-        line=dict(color="#70AD47", width=2.5),
-        marker=dict(size=6, color="#70AD47"),
+        name="AAK", x=labels, y=aak_vals, yaxis="y",
+        mode="lines+markers+text",
+        line=dict(color=_LARANJA_SN, width=2.5),
+        marker=dict(size=6, color=_LARANJA_SN),
+        text=[str(v) if v > 0 else "" for v in aak_vals],
+        textposition="top center",
+        textfont=dict(size=9, color=_LARANJA_SN),
         hovertemplate="<b>%{x}</b><br>AAK: %{y}<extra></extra>",
     ))
 
+    # Linha PENETRATION (eixo direito, %)
+    fig.add_trace(go.Scatter(
+        name="PENETRATION", x=labels, y=penet, yaxis="y2",
+        mode="lines+markers+text",
+        line=dict(color="#70AD47", width=2.5, dash="dash"),
+        marker=dict(size=6, color="#70AD47"),
+        text=[f"{v:.0f}%" if v > 0 else "" for v in penet],
+        textposition="top center",
+        textfont=dict(size=9, color="#70AD47"),
+        hovertemplate="<b>%{x}</b><br>Penetration: %{y:.1f}%<extra></extra>",
+    ))
+
     fig.update_layout(
-        barmode       = "stack",
+        barmode       = "group",
         template      = "plotly_white",
-        height        = 440,
+        height        = 460,
         plot_bgcolor  = "white",
         paper_bgcolor = "white",
-        bargap        = 0.28,
-        yaxis  = dict(range=[0, y_max_bars], showgrid=True, gridcolor="#e5e7eb",
+        bargap        = 0.32,
+        yaxis  = dict(range=[0, y_max], showgrid=True, gridcolor="#e5e7eb",
                       zeroline=False, tickfont=dict(size=11)),
-        yaxis2 = dict(overlaying="y", side="right", range=[0, y_max_line],
+        yaxis2 = dict(overlaying="y", side="right",
+                      range=[0, penet_max],
+                      ticksuffix="%",
                       showgrid=False, zeroline=False, tickfont=dict(size=11)),
-        xaxis  = dict(showgrid=False, tickfont=dict(size=11)),
-        legend = dict(orientation="h", yanchor="bottom", y=-0.22,
-                      xanchor="left", x=0, font=dict(size=12),
-                      traceorder="reversed"),
-        margin     = dict(l=20, r=50, t=20, b=70),
+        xaxis  = dict(showgrid=False, tickfont=dict(size=10)),
+        legend = dict(orientation="h", yanchor="bottom", y=-0.25,
+                      xanchor="left", x=0, font=dict(size=12)),
+        margin     = dict(l=20, r=60, t=30, b=80),
         hoverlabel = dict(bgcolor="white", font_size=13),
     )
 
@@ -883,7 +909,7 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
         # ── Entrada manual de AAK (bloco isolado) ─────────────────────────────
         _aak_atual: dict[str, int] = {}
         try:
-            _meses_aak = _meses_range(6)
+            _meses_aak = _meses_range(_AAK_N_MESES)
             _aak_atual = _aak_load()
             with st.expander("✏️ Valores AAK — entrada manual"):
                 _df_aak = pd.DataFrame({
