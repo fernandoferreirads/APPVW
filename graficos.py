@@ -490,6 +490,116 @@ def _chart_protege(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     return _chart_produto(df, col="protege", titulo="PROTEGE", y_min_floor=50)
 
 
+# ─── Gráfico 5b — Sempre Novo (Qtd + % AAk vs AAK) ──────────────────────────
+
+def _chart_sempre_novo(
+    df: pd.DataFrame,
+    aak_manual: dict[str, int] | None = None,
+) -> tuple[go.Figure, pd.DataFrame]:
+    """
+    SEMPRE NOVO: barras azuis (Qtd) + linha laranja (% AAk = Qtd/AAK, eixo dir.).
+    Diferente dos outros produtos: denominador = AAK manual (não total contratos).
+    Coluna BIGBASE: sempre_novo (pos. 22, col W).
+    """
+    meses = _meses_completos(7)
+
+    if "sempre_novo" not in df.columns or "data_pagto" not in df.columns:
+        return _fig_sem_dados(
+            "Coluna 'sempre_novo' ou 'data_pagto' não encontrada no BIGBASE"
+        ), pd.DataFrame()
+
+    df_w = df.copy()
+    df_w["_periodo"] = df_w["data_pagto"].dt.to_period("M")
+
+    _aak = aak_manual or {}
+    qtds:  list[int]   = []
+    pcts:  list[float] = []
+
+    for (y, m, _) in meses:
+        period = pd.Period(year=y, month=m, freq="M")
+        sub    = df_w[df_w["_periodo"] == period]
+        vals   = sub["sempre_novo"].fillna("").astype(str).str.strip()
+        qtd    = len(vals[~vals.isin(["", "nan", "None"])])
+
+        key   = f"{y:04d}-{m:02d}"
+        aak_v = _aak.get(key, 0)
+        pct   = round(qtd / aak_v * 100, 1) if aak_v > 0 else 0.0
+
+        qtds.append(qtd)
+        pcts.append(pct)
+
+    labels = [nome for (_, _, nome) in meses]
+
+    # Tendência M.A — média dos últimos 3 meses
+    if len(qtds) >= 3:
+        ma_qtd = round(sum(qtds[-3:]) / 3)
+        ma_pct = round(sum(pcts[-3:]) / 3, 1)
+    elif qtds:
+        ma_qtd, ma_pct = qtds[-1], pcts[-1]
+    else:
+        ma_qtd = ma_pct = 0
+
+    labels.append("TENDÊNCIA\nM.A")
+    label_tabela = [lbl.replace("\n", " ") for lbl in labels]
+    qtds.append(ma_qtd)
+    pcts.append(ma_pct)
+
+    bar_colors = [_AZUL_NV] * (len(labels) - 1) + [_LARANJA_SN]
+
+    y_max_qtd = max(max(qtds, default=0) * 1.25, 10)
+    y_max_pct = max(max(pcts, default=0) * 1.25, 30.0)
+
+    df_tabela = _str_df(pd.DataFrame({
+        "": ["Qtd", "% AAk"],
+        **{label_tabela[i]: [str(qtds[i]), f"{pcts[i]:.0f}%"]
+           for i in range(len(label_tabela))},
+    }))
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        name         = "Qtd",
+        x            = labels,
+        y            = qtds,
+        marker_color = bar_colors,
+        yaxis        = "y",
+        text         = ["" if i < len(labels) - 1 else str(ma_qtd)
+                        for i in range(len(labels))],
+        textposition = "outside",
+        textfont     = dict(size=12, color=_LARANJA_SN, family="Inter, sans-serif"),
+        hovertemplate= "<b>%{x}</b><br>Qtd: %{y}<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        name         = "% AAk",
+        x            = labels,
+        y            = pcts,
+        mode         = "lines+markers",
+        yaxis        = "y2",
+        line         = dict(color=_LARANJA_SN, width=2.5),
+        marker       = dict(size=6, color=_LARANJA_SN, symbol="circle"),
+        hovertemplate= "<b>%{x}</b><br>% AAk: %{y:.1f}%<extra></extra>",
+    ))
+    fig.update_layout(
+        template      = "plotly_white",
+        height        = 440,
+        plot_bgcolor  = "white",
+        paper_bgcolor = "white",
+        bargap        = 0.28,
+        yaxis  = dict(title="", side="left",  dtick=5,  range=[0, y_max_qtd],
+                      showgrid=True, gridcolor="#e5e7eb", zeroline=False,
+                      tickfont=dict(size=11)),
+        yaxis2 = dict(title="", side="right", overlaying="y",
+                      range=[0, y_max_pct], dtick=5,
+                      ticksuffix="%", showgrid=False, zeroline=False,
+                      tickfont=dict(size=11)),
+        xaxis  = dict(showgrid=False, tickfont=dict(size=11)),
+        legend = dict(orientation="h", yanchor="bottom", y=-0.22,
+                      xanchor="left", x=0, font=dict(size=12)),
+        margin     = dict(l=20, r=50, t=20, b=70),
+        hoverlabel = dict(bgcolor="white", font_size=13),
+    )
+    return fig, df_tabela
+
+
 # ─── Gráfico 6 — Total Pontos ────────────────────────────────────────────────
 
 def _chart_pontos(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
@@ -853,14 +963,15 @@ def _gerar_pdf(df: pd.DataFrame, aak_manual: dict) -> bytes:
 
     # ── Coleta todas as figuras ───────────────────────────────────────────────
     graficos = [
-        ("CONTRATOS NV vs SN", _chart_contratos_nv_sn(df)),
-        ("GARANTIAS",          _chart_garantias(df)),
-        ("SEGUROS",            _chart_seguros(df)),
-        ("SPF",                _chart_spf(df)),
-        ("PROTEGE",            _chart_protege(df)),
-        ("TOTAL PONTOS",          _chart_pontos(df)),
-        ("PONTOS POR CONTRATO",   _chart_pontos_por_contrato(df)),
-        ("CONTRATOS E AAK",       _chart_contratos_aak(df, aak_manual=aak_manual or {})),
+        ("CONTRATOS NV vs SN",  _chart_contratos_nv_sn(df)),
+        ("GARANTIAS",           _chart_garantias(df)),
+        ("SEGUROS",             _chart_seguros(df)),
+        ("SPF",                 _chart_spf(df)),
+        ("PROTEGE",             _chart_protege(df)),
+        ("SEMPRE NOVO",         _chart_sempre_novo(df, aak_manual=aak_manual or {})),
+        ("TOTAL PONTOS",        _chart_pontos(df)),
+        ("PONTOS POR CONTRATO", _chart_pontos_por_contrato(df)),
+        ("CONTRATOS E AAK",     _chart_contratos_aak(df, aak_manual=aak_manual or {})),
     ]
 
     story = []
@@ -1140,6 +1251,30 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                              column_config={"": st.column_config.TextColumn("", width="medium")})
     except Exception as _e_pro:
         st.error(f"❌ Erro ao renderizar PROTEGE: {_e_pro}")
+        import traceback
+        st.code(traceback.format_exc(), language="python")
+
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Gráfico 5b — Sempre Novo (Qtd + % AAk vs AAK)
+    # ═══════════════════════════════════════════════════════════════════════════
+    try:
+        with st.container(border=True):
+            st.markdown(
+                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+                "text-align:center;margin-bottom:2px'>SEMPRE NOVO</p>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Qtd de Sempre Novo produzidos (barras, eixo esq.) · % AAk = Qtd / AAK do mês (linha, eixo dir.)")
+
+            fig5b, tbl5b = _chart_sempre_novo(df, aak_manual=_aak_load())
+            st.plotly_chart(fig5b, use_container_width=True)
+            if not tbl5b.empty:
+                st.dataframe(tbl5b, use_container_width=True, hide_index=True,
+                             column_config={"": st.column_config.TextColumn("", width="medium")})
+    except Exception as _e_sn:
+        st.error(f"❌ Erro ao renderizar SEMPRE NOVO: {_e_sn}")
         import traceback
         st.code(traceback.format_exc(), language="python")
 

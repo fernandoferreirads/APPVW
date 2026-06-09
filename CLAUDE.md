@@ -142,13 +142,17 @@ label_tabela = [lbl.replace("\n", " ") for lbl in labels] # tabela pandas (sem \
 
 ## Gráficos Implementados (aba 📈 Gráficos)
 
-| # | Título | Tipo | Coluna BIGBASE | Filtro | y_min_floor |
+| # | Título | Tipo | Coluna BIGBASE | Filtro | y_min_floor / obs |
 |---|---|---|---|---|---|
 | 1 | CONTRATOS | Barras empilhadas NV/SN | `tipo_veiculo` | N ou S | — |
 | 2 | GARANTIAS | Barras + linha % AAK | `ge` | — | 50 |
 | 3 | SEGUROS | Barras + linha % AAK | `app` | `"Seguro VW"` | 200 |
 | 4 | SPF | Barras agrupadas Total/Plus | `spf` | `"PLUS"` para Plus | 100 |
 | 5 | PROTEGE | Barras + linha % AAK | `protege` | — | 50 |
+| 5b | SEMPRE NOVO | Barras + linha % AAk | `sempre_novo` | — | % = Qtd/AAK |
+| 6 | TOTAL PONTOS | Barras simples | `pontos` | — | — |
+| 7 | PONTOS POR CONTRATO | Barras + linha META | `pontos`, `tipo_veiculo` | — | META = 1,5 |
+| 8 | CONTRATOS E AAK | Barras agrupadas + linhas | `tipo_veiculo` | N ou S | AAK manual |
 
 ---
 
