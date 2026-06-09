@@ -107,7 +107,9 @@ _BIGBASE_SPEC: list[tuple[str, list[str], int | None]] = [
     ("cliente",          ["CLIENTE","NOME CLIENTE","RAZAO SOCIAL"],          None),
     ("cpf_cnpj",         ["CPF/CNPJ","CPF","CNPJ","DOCUMENTO"],             None),
     ("valor_financiado", ["VALOR FINANCIADO","VL FINANCIADO"],               None),
-    ("pontos",           ["PONTOS","PONTOS POR CONTRATOS"],                  None),
+    ("pontos",           ["PONTOS","PONTOS POR CONTRATOS",
+                          "P/CONTRATO REAL","P/ CONTRATO REAL",
+                          "PONTOS/CONTRATO","PONTO/CONTRATO"],               None),
 ]
 
 
