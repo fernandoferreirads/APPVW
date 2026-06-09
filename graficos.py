@@ -736,6 +736,19 @@ def _gerar_pdf(df: pd.DataFrame, aak_manual: dict) -> bytes:
         spaceAfter=4,
     )
 
+    # ── Configura kaleido para ambientes containerizados (Streamlit Cloud) ───
+    # kaleido 0.2.1 embute o Chromium mas precisa de --no-sandbox em Docker/Linux
+    try:
+        import plotly.io as _pio
+        _pio.kaleido.scope.chromium_args = (
+            "--disable-gpu",
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-software-rasterizer",
+        )
+    except Exception:
+        pass
+
     # ── Coleta todas as figuras ───────────────────────────────────────────────
     graficos = [
         ("CONTRATOS NV vs SN", _chart_contratos_nv_sn(df)),
