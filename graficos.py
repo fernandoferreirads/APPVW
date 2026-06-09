@@ -600,8 +600,10 @@ def _chart_pontos_por_contrato(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFram
         period = pd.Period(year=y, month=m, freq="M")
         sub    = df_w[df_w["_periodo"] == period]
         total_pontos = float(sub["_pontos_num"].sum())
-        tv = sub["tipo_veiculo"].astype(str).str.upper()
-        tt = len(tv[tv.str.startswith("N", na=False)]) + len(tv[tv.str.startswith("S", na=False)])
+        tv = sub["tipo_veiculo"].str.upper()
+        nv = len(sub[tv.str.startswith("N", na=False)])
+        sn = len(sub[tv.str.startswith("S", na=False)])
+        tt = nv + sn
         medias.append(round(total_pontos / tt, 2) if tt > 0 else 0.0)
 
     labels = [nome for (_, _, nome) in meses]
@@ -1170,10 +1172,6 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
     # ═══════════════════════════════════════════════════════════════════════════
     # Gráfico 8 — Pontos por Contrato
     # ═══════════════════════════════════════════════════════════════════════════
-    # marcador externo — aparece independentemente de exceção
-    _ppc_cols = [c for c in df.columns if "ponto" in c.lower() or "retorno" in c.lower()]
-    st.caption(f"🔍 PPC debug — colunas: {_ppc_cols}")
-    import traceback as _tb8
     try:
         with st.container(border=True):
             st.markdown(
@@ -1181,16 +1179,17 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                 "text-align:center;margin-bottom:2px'>PONTOS POR CONTRATO</p>",
                 unsafe_allow_html=True,
             )
-            st.caption("Media de pontos por contrato (barras) · META = 1,5 (linha laranja)")
+            st.caption("Média de pontos por contrato (barras) · META = 1,5 (linha laranja)")
 
             fig8, tbl8 = _chart_pontos_por_contrato(df)
             st.plotly_chart(fig8, use_container_width=True)
             if not tbl8.empty:
                 st.dataframe(tbl8, use_container_width=True, hide_index=True,
                              column_config={"": st.column_config.TextColumn("", width="medium")})
-    except BaseException as _e_ppc:
-        st.error(f"❌ Erro PPC [{type(_e_ppc).__name__}]: {_e_ppc}")
-        st.code(_tb8.format_exc(), language="python")
+    except Exception as _e_ppc:
+        st.error(f"❌ Erro ao renderizar PONTOS POR CONTRATO: {_e_ppc}")
+        import traceback
+        st.code(traceback.format_exc(), language="python")
 
     st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
 
