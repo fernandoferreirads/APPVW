@@ -61,6 +61,11 @@ def _periodo_atual() -> pd.Period:
     return pd.Period(datetime.now(), "M")
 
 
+def _str_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Força StringDtype em todas as colunas — impede pyarrow de inferir int64."""
+    return df.astype(pd.StringDtype())
+
+
 def _fig_sem_dados(msg: str, height: int = 300) -> go.Figure:
     """Figura vazia com mensagem centralizada."""
     fig = go.Figure()
@@ -117,10 +122,10 @@ def _chart_contratos_nv_sn(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     nv_vals.append(ma_nv)
     sn_vals.append(ma_sn)
 
-    df_tabela = pd.DataFrame({
+    df_tabela = _str_df(pd.DataFrame({
         "": ["CONTRATOS SN", "CONTRATOS NV"],
-        **{labels[i]: [sn_vals[i], nv_vals[i]] for i in range(len(labels))},
-    })
+        **{labels[i]: [str(sn_vals[i]), str(nv_vals[i])] for i in range(len(labels))},
+    }))
 
     total_vals = [nv + sn for nv, sn in zip(nv_vals, sn_vals)]
     y_max      = max(max(total_vals, default=0) * 1.18, 300)
@@ -221,11 +226,11 @@ def _chart_produto(
 
     bar_colors = [_AZUL_NV] * (len(labels) - 1) + [_LARANJA_SN]
 
-    df_tabela = pd.DataFrame({
+    df_tabela = _str_df(pd.DataFrame({
         "": ["Qtd", "% AAK"],
         **{label_tabela[i]: [str(qtd[i]), f"{pct_aak[i]:.0f}%"]
            for i in range(len(label_tabela))},
-    })
+    }))
 
     y_max_qtd = max(max(qtd, default=0) * 1.20, y_min_floor)
     y_max_pct = max(max(pct_aak, default=0) * 1.20, 140)
@@ -358,7 +363,7 @@ def _chart_spf(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     pct_aak.append(ma_pct)
     pct_plus.append(ma_pct_p)
 
-    df_tabela = pd.DataFrame({
+    df_tabela = _str_df(pd.DataFrame({
         "": ["Total Spfs", "Spf Plus", "% AAK", "Aak Plus"],
         **{label_tabela[i]: [
             str(total_spf[i]),
@@ -366,7 +371,7 @@ def _chart_spf(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
             f"{pct_aak[i]:.0f}%",
             f"{pct_plus[i]:.0f}%",
         ] for i in range(len(label_tabela))},
-    })
+    }))
 
     y_max = max(max(total_spf, default=0) * 1.35, 100)
 
