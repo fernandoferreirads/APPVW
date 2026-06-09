@@ -8,13 +8,19 @@ com a vantagem de serem interativos, filtráveis e sem dependência de sessão E
 
 from __future__ import annotations
 
+import json
+import os
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
 from comissao import load_bigbase
+
+# ─── Caminho do arquivo de persistência AAK ───────────────────────────────────
+_AAK_FILE = Path(__file__).parent / "credentials" / "aak_data.json"
 
 # ─── Paleta fiel ao Excel ──────────────────────────────────────────────────────
 _AZUL_NV    = "#4472C4"   # azul Excel (barras principais)
@@ -64,6 +70,22 @@ def _periodo_atual() -> pd.Period:
 def _str_df(df: pd.DataFrame) -> pd.DataFrame:
     """Força StringDtype em todas as colunas — impede pyarrow de inferir int64."""
     return df.astype(pd.StringDtype())
+
+
+def _aak_load() -> dict[str, int]:
+    """Lê credentials/aak_data.json → {YYYY-MM: int}. Retorna {} se não existir."""
+    try:
+        if _AAK_FILE.exists():
+            return {k: int(v) for k, v in json.loads(_AAK_FILE.read_text()).items()}
+    except Exception:
+        pass
+    return {}
+
+
+def _aak_save(data: dict[str, int]) -> None:
+    """Salva {YYYY-MM: int} em credentials/aak_data.json."""
+    _AAK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _AAK_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2))
 
 
 def _fig_sem_dados(msg: str, height: int = 300) -> go.Figure:
@@ -164,11 +186,15 @@ def _chart_contratos_nv_sn(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
 
 # ─── Gráfico 7 — Contratos + AAK (barras empilhadas + linha AAK) ─────────────
 
-def _chart_contratos_aak(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
+def _chart_contratos_aak(
+    df: pd.DataFrame,
+    aak_manual: dict[str, int] | None = None,
+) -> tuple[go.Figure, pd.DataFrame]:
     """
     Barras empilhadas: CONTRATOS NV (azul) + CONTRATOS SN (laranja).
-    Linha verde: AAK = soma de todos os produtos F&I individuais por mês.
+    Linha verde: AAK por mês (manual se disponível, senão soma produtos BIGBASE).
     Tabela: CONTRATOS TT | AAK | PENETRATION (NV / AAK × 100).
+    aak_manual: {YYYY-MM: int} carregado de credentials/aak_data.json.
     """
     meses = _meses_range(6)     # 5 meses completos + mês vigente
     hoje  = _periodo_atual()
@@ -189,21 +215,25 @@ def _chart_contratos_aak(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     aak_vals: list[int] = []
 
     for (y, m, _) in meses:
-        period = pd.Period(year=y, month=m, freq="M")
-        sub    = df_w[df_w["_periodo"] == period]
-        tv     = sub["tipo_veiculo"].fillna("").str.strip().str.upper()
+        period     = pd.Period(year=y, month=m, freq="M")
+        period_str = f"{y:04d}-{m:02d}"
+        sub        = df_w[df_w["_periodo"] == period]
+        tv         = sub["tipo_veiculo"].fillna("").str.strip().str.upper()
 
         nv_vals.append(int((tv == "N").sum()))
         sn_vals.append(int((tv == "S").sum()))
         tt_vals.append(len(sub))
 
-        # AAK = total de produtos individuais vendidos (cada coluna conta separado)
-        aak = 0
-        for col in _PROD_COLS:
-            if col in df_w.columns:
-                v = sub[col].fillna("").astype(str).str.strip()
-                aak += len(v[~v.isin(["", "nan", "None"])])
-        aak_vals.append(aak)
+        # AAK: usa valor manual se disponível, senão calcula da BIGBASE
+        if aak_manual and period_str in aak_manual:
+            aak_vals.append(int(aak_manual[period_str]))
+        else:
+            aak = 0
+            for col in _PROD_COLS:
+                if col in df_w.columns:
+                    v = sub[col].fillna("").astype(str).str.strip()
+                    aak += len(v[~v.isin(["", "nan", "None"])])
+            aak_vals.append(aak)
 
     labels = [nome for (_, _, nome) in meses]
 
@@ -849,9 +879,40 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                 "text-align:center;margin-bottom:2px'>CONTRATOS E AAK</p>",
                 unsafe_allow_html=True,
             )
-            st.caption("Contratos NV + SN (barras, eixo esq.) · AAK = total produtos F&I por mês (linha, eixo dir.)")
+            st.caption("Contratos NV + SN (barras, eixo esq.) · AAK = entrada manual por mês (linha, eixo dir.)")
 
-            fig7, tbl7 = _chart_contratos_aak(df)
+            # ── Entrada manual de AAK ─────────────────────────────────────────
+            _meses_aak = _meses_range(6)
+            _aak_atual = _aak_load()
+
+            with st.expander("✏️ Valores AAK — entrada manual"):
+                _df_aak = pd.DataFrame({
+                    "Mês":     [nome for (_, _, nome) in _meses_aak],
+                    "_periodo":[f"{y:04d}-{m:02d}" for (y, m, _) in _meses_aak],
+                    "AAK":     [_aak_atual.get(f"{y:04d}-{m:02d}", 0)
+                                for (y, m, _) in _meses_aak],
+                })
+                _editado = st.data_editor(
+                    _df_aak[["Mês", "AAK"]],
+                    disabled=["Mês"],
+                    use_container_width=True,
+                    hide_index=True,
+                    key="aak_editor",
+                    column_config={
+                        "AAK": st.column_config.NumberColumn("AAK", min_value=0, step=1),
+                    },
+                )
+                if st.button("💾 Salvar AAK", key="btn_salvar_aak"):
+                    _novo = {
+                        _df_aak["_periodo"].iloc[i]: int(_editado["AAK"].iloc[i])
+                        for i in range(len(_editado))
+                    }
+                    _aak_atual.update(_novo)
+                    _aak_save(_aak_atual)
+                    st.success("✅ AAK salvo com sucesso!")
+                    st.rerun()
+
+            fig7, tbl7 = _chart_contratos_aak(df, aak_manual=_aak_atual)
             st.plotly_chart(fig7, use_container_width=True)
             if not tbl7.empty:
                 st.dataframe(tbl7, use_container_width=True, hide_index=True,
