@@ -301,6 +301,89 @@ def _chart_protege(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     return _chart_produto(df, col="protege", titulo="PROTEGE", y_min_floor=50)
 
 
+# ─── Gráfico 6 — Total Pontos ────────────────────────────────────────────────
+
+def _chart_pontos(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
+    """
+    Total de Pontos por mês — SOMA da coluna 'pontos' (valores decimais).
+    Barras azuis por mês + barra laranja TENDÊNCIA M.A.
+    Sem linha % AAK — gráfico de barras simples.
+    """
+    meses = _meses_completos(7)
+
+    if "pontos" not in df.columns or "data_pagto" not in df.columns:
+        return _fig_sem_dados(
+            "Coluna 'pontos' ou 'data_pagto' não encontrada no BIGBASE"
+        ), pd.DataFrame()
+
+    df_w = df.copy()
+    df_w["_periodo"]    = df_w["data_pagto"].dt.to_period("M")
+    df_w["_pontos_num"] = pd.to_numeric(df_w["pontos"], errors="coerce").fillna(0.0)
+
+    totais: list[float] = []
+
+    for (y, m, _) in meses:
+        period = pd.Period(year=y, month=m, freq="M")
+        sub    = df_w[df_w["_periodo"] == period]
+        totais.append(round(float(sub["_pontos_num"].sum()), 2))
+
+    labels = [nome for (_, _, nome) in meses]
+
+    # Tendência M.A — média dos últimos 3 meses completos
+    if len(totais) >= 3:
+        ma = round(sum(totais[-3:]) / 3, 2)
+    elif totais:
+        ma = totais[-1]
+    else:
+        ma = 0.0
+
+    labels.append("TENDÊNCIA\nM.A")
+    label_tabela = [lbl.replace("\n", " ") for lbl in labels]
+    totais.append(ma)
+
+    bar_colors = [_AZUL_NV] * (len(labels) - 1) + [_LARANJA_SN]
+
+    # Formata com vírgula decimal (padrão brasileiro)
+    def _fmt(v: float) -> str:
+        return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    df_tabela = _str_df(pd.DataFrame({
+        "": ["Pontos"],
+        **{label_tabela[i]: [_fmt(totais[i])] for i in range(len(label_tabela))},
+    }))
+
+    y_max = max(max(totais, default=0) * 1.18, 500)
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        name         = "Pontos",
+        x            = labels,
+        y            = totais,
+        marker_color = bar_colors,
+        text         = [_fmt(v) for v in totais],
+        textposition = "outside",
+        textfont     = dict(size=11, color="#1a1a2e"),
+        hovertemplate= "<b>%{x}</b><br>Pontos: %{text}<extra></extra>",
+    ))
+
+    fig.update_layout(
+        template      = "plotly_white",
+        height        = 440,
+        plot_bgcolor  = "white",
+        paper_bgcolor = "white",
+        bargap        = 0.28,
+        yaxis  = dict(dtick=50, range=[0, y_max], showgrid=True,
+                      gridcolor="#e5e7eb", zeroline=False, tickfont=dict(size=11)),
+        xaxis  = dict(showgrid=False, tickfont=dict(size=11)),
+        legend = dict(orientation="h", yanchor="bottom", y=-0.22,
+                      xanchor="left", x=0, font=dict(size=12)),
+        margin     = dict(l=20, r=20, t=20, b=70),
+        hoverlabel = dict(bgcolor="white", font_size=13),
+    )
+
+    return fig, df_tabela
+
+
 # ─── Gráfico 4 — SPF (barras agrupadas Total vs Plus) ────────────────────────
 
 def _chart_spf(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
@@ -594,5 +677,29 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                              column_config={"": st.column_config.TextColumn("", width="medium")})
     except Exception as _e_pro:
         st.error(f"❌ Erro ao renderizar PROTEGE: {_e_pro}")
+        import traceback
+        st.code(traceback.format_exc(), language="python")
+
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Gráfico 6 — Total Pontos
+    # ═══════════════════════════════════════════════════════════════════════════
+    try:
+        with st.container(border=True):
+            st.markdown(
+                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+                "text-align:center;margin-bottom:2px'>TOTAL PONTOS</p>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Soma total de pontos por mês · TENDÊNCIA M.A = média dos últimos 3 meses completos")
+
+            fig6, tbl6 = _chart_pontos(df)
+            st.plotly_chart(fig6, use_container_width=True)
+            if not tbl6.empty:
+                st.dataframe(tbl6, use_container_width=True, hide_index=True,
+                             column_config={"": st.column_config.TextColumn("", width="medium")})
+    except Exception as _e_pts:
+        st.error(f"❌ Erro ao renderizar TOTAL PONTOS: {_e_pts}")
         import traceback
         st.code(traceback.format_exc(), language="python")
