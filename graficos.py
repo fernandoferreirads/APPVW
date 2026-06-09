@@ -162,6 +162,139 @@ def _chart_contratos_nv_sn(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     return fig, df_tabela
 
 
+# ─── Gráfico 7 — Contratos + AAK (barras empilhadas + linha AAK) ─────────────
+
+def _chart_contratos_aak(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
+    """
+    Barras empilhadas: CONTRATOS NV (azul) + CONTRATOS SN (laranja).
+    Linha verde: AAK = soma de todos os produtos F&I individuais por mês.
+    Tabela: CONTRATOS TT | AAK | PENETRATION (NV / AAK × 100).
+    """
+    meses = _meses_range(6)     # 5 meses completos + mês vigente
+    hoje  = _periodo_atual()
+
+    _PROD_COLS = ["spf", "app", "gap", "franquia", "ge", "protege"]
+
+    if "tipo_veiculo" not in df.columns or "data_pagto" not in df.columns:
+        return _fig_sem_dados(
+            "Colunas necessárias não encontradas no BIGBASE"
+        ), pd.DataFrame()
+
+    df_w = df.copy()
+    df_w["_periodo"] = df_w["data_pagto"].dt.to_period("M")
+
+    nv_vals:  list[int] = []
+    sn_vals:  list[int] = []
+    tt_vals:  list[int] = []
+    aak_vals: list[int] = []
+
+    for (y, m, _) in meses:
+        period = pd.Period(year=y, month=m, freq="M")
+        sub    = df_w[df_w["_periodo"] == period]
+        tv     = sub["tipo_veiculo"].fillna("").str.strip().str.upper()
+
+        nv_vals.append(int((tv == "N").sum()))
+        sn_vals.append(int((tv == "S").sum()))
+        tt_vals.append(len(sub))
+
+        # AAK = total de produtos individuais vendidos (cada coluna conta separado)
+        aak = 0
+        for col in _PROD_COLS:
+            if col in df_w.columns:
+                v = sub[col].fillna("").astype(str).str.strip()
+                aak += len(v[~v.isin(["", "nan", "None"])])
+        aak_vals.append(aak)
+
+    labels = [nome for (_, _, nome) in meses]
+
+    # Tendência M.A — média dos 3 últimos meses COMPLETOS
+    idx_comp = [i for i, (y, m, _) in enumerate(meses)
+                if pd.Period(year=y, month=m, freq="M") < hoje]
+    if idx_comp:
+        ult3   = idx_comp[-3:]
+        ma_nv  = round(sum(nv_vals[i]  for i in ult3) / len(ult3))
+        ma_sn  = round(sum(sn_vals[i]  for i in ult3) / len(ult3))
+        ma_tt  = round(sum(tt_vals[i]  for i in ult3) / len(ult3))
+        ma_aak = round(sum(aak_vals[i] for i in ult3) / len(ult3))
+    else:
+        ma_nv = ma_sn = ma_tt = ma_aak = 0
+
+    labels.append("TENDÊNCIA M.A")
+    nv_vals.append(ma_nv)
+    sn_vals.append(ma_sn)
+    tt_vals.append(ma_tt)
+    aak_vals.append(ma_aak)
+
+    # PENETRATION = NV / AAK × 100
+    penet: list[float] = [
+        round(nv / aak * 100, 1) if aak > 0 else 0.0
+        for nv, aak in zip(nv_vals, aak_vals)
+    ]
+
+    df_tabela = _str_df(pd.DataFrame({
+        "": ["CONTRATOS TT", "AAK", "PENETRATION"],
+        **{labels[i]: [
+            str(tt_vals[i]),
+            str(aak_vals[i]),
+            f"{penet[i]:.0f}%",
+        ] for i in range(len(labels))},
+    }))
+
+    total_vals  = [nv + sn for nv, sn in zip(nv_vals, sn_vals)]
+    y_max_bars  = max(max(total_vals, default=0) * 1.20, 300)
+    y_max_line  = max(max(aak_vals,   default=0) * 1.30, 300)
+
+    fig = go.Figure()
+
+    # ── Barras empilhadas ─────────────────────────────────────────────────────
+    fig.add_trace(go.Bar(
+        name="CONTRATOS NV", x=labels, y=nv_vals, yaxis="y",
+        marker_color=_AZUL_NV,
+        text=[str(v) if v > 0 else "" for v in nv_vals],
+        textposition="inside", insidetextanchor="middle",
+        textfont=dict(color="white", size=11),
+        hovertemplate="<b>%{x}</b><br>NV: %{y}<extra></extra>",
+    ))
+    fig.add_trace(go.Bar(
+        name="CONTRATOS SN", x=labels, y=sn_vals, yaxis="y",
+        marker_color=_LARANJA_SN,
+        text=[str(v) if v > 0 else "" for v in sn_vals],
+        textposition="inside", insidetextanchor="middle",
+        textfont=dict(color="white", size=11),
+        hovertemplate="<b>%{x}</b><br>SN: %{y}<extra></extra>",
+    ))
+
+    # ── Linha AAK (eixo direito) ───────────────────────────────────────────────
+    fig.add_trace(go.Scatter(
+        name="AAK", x=labels, y=aak_vals, yaxis="y2",
+        mode="lines+markers",
+        line=dict(color="#70AD47", width=2.5),
+        marker=dict(size=6, color="#70AD47"),
+        hovertemplate="<b>%{x}</b><br>AAK: %{y}<extra></extra>",
+    ))
+
+    fig.update_layout(
+        barmode       = "stack",
+        template      = "plotly_white",
+        height        = 440,
+        plot_bgcolor  = "white",
+        paper_bgcolor = "white",
+        bargap        = 0.28,
+        yaxis  = dict(range=[0, y_max_bars], showgrid=True, gridcolor="#e5e7eb",
+                      zeroline=False, tickfont=dict(size=11)),
+        yaxis2 = dict(overlaying="y", side="right", range=[0, y_max_line],
+                      showgrid=False, zeroline=False, tickfont=dict(size=11)),
+        xaxis  = dict(showgrid=False, tickfont=dict(size=11)),
+        legend = dict(orientation="h", yanchor="bottom", y=-0.22,
+                      xanchor="left", x=0, font=dict(size=12),
+                      traceorder="reversed"),
+        margin     = dict(l=20, r=50, t=20, b=70),
+        hoverlabel = dict(bgcolor="white", font_size=13),
+    )
+
+    return fig, df_tabela
+
+
 # ─── Helper genérico — Qtd + % AAK (reutilizado por GE, SPF, etc.) ──────────
 
 def _chart_produto(
@@ -701,5 +834,29 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                              column_config={"": st.column_config.TextColumn("", width="medium")})
     except Exception as _e_pts:
         st.error(f"❌ Erro ao renderizar TOTAL PONTOS: {_e_pts}")
+        import traceback
+        st.code(traceback.format_exc(), language="python")
+
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Gráfico 7 — Contratos + AAK
+    # ═══════════════════════════════════════════════════════════════════════════
+    try:
+        with st.container(border=True):
+            st.markdown(
+                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+                "text-align:center;margin-bottom:2px'>CONTRATOS E AAK</p>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Contratos NV + SN (barras, eixo esq.) · AAK = total produtos F&I por mês (linha, eixo dir.)")
+
+            fig7, tbl7 = _chart_contratos_aak(df)
+            st.plotly_chart(fig7, use_container_width=True)
+            if not tbl7.empty:
+                st.dataframe(tbl7, use_container_width=True, hide_index=True,
+                             column_config={"": st.column_config.TextColumn("", width="medium")})
+    except Exception as _e_aak:
+        st.error(f"❌ Erro ao renderizar CONTRATOS E AAK: {_e_aak}")
         import traceback
         st.code(traceback.format_exc(), language="python")
