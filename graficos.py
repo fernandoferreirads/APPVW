@@ -164,6 +164,7 @@ def _chart_produto(
     col: str,
     titulo: str,
     filtro: str | None = None,
+    y_min_floor: int = 50,
 ) -> tuple[go.Figure, pd.DataFrame]:
     """
     Barras azuis (Qtd, eixo esq.) + linha laranja (% AAK, eixo dir.).
@@ -226,7 +227,7 @@ def _chart_produto(
            for i in range(len(label_tabela))},
     })
 
-    y_max_qtd = max(max(qtd, default=0) * 1.20, 200)
+    y_max_qtd = max(max(qtd, default=0) * 1.20, y_min_floor)
     y_max_pct = max(max(pct_aak, default=0) * 1.20, 140)
 
     fig = go.Figure()
@@ -285,7 +286,14 @@ def _chart_garantias(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
 
 def _chart_seguros(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     """Seguros VW — coluna N (app, pos. 13), filtra apenas 'SEGURO VW'."""
-    return _chart_produto(df, col="app", titulo="SEGUROS", filtro="SEGURO VW")
+    return _chart_produto(df, col="app", titulo="SEGUROS", filtro="SEGURO VW", y_min_floor=200)
+
+
+# ─── Gráfico 4 — Protege (Qtd + % AAK) ──────────────────────────────────────
+
+def _chart_protege(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
+    """VW Protege — coluna S (protege, pos. 18)."""
+    return _chart_produto(df, col="protege", titulo="PROTEGE", y_min_floor=50)
 
 
 # ─── Gráfico 4 — SPF (barras agrupadas Total vs Plus) ────────────────────────
@@ -557,5 +565,29 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                              column_config={"": st.column_config.TextColumn("", width="medium")})
     except Exception as _e_spf:
         st.error(f"❌ Erro ao renderizar SPF: {_e_spf}")
+        import traceback
+        st.code(traceback.format_exc(), language="python")
+
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Gráfico 5 — Protege (Qtd + % AAK)
+    # ═══════════════════════════════════════════════════════════════════════════
+    try:
+        with st.container(border=True):
+            st.markdown(
+                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+                "text-align:center;margin-bottom:2px'>PROTEGE</p>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Qtd de VW Protege produzidos (barras, eixo esq.) · % AAK = Protege / total contratos (linha, eixo dir.)")
+
+            fig5, tbl5 = _chart_protege(df)
+            st.plotly_chart(fig5, use_container_width=True)
+            if not tbl5.empty:
+                st.dataframe(tbl5, use_container_width=True, hide_index=True,
+                             column_config={"": st.column_config.TextColumn("", width="medium")})
+    except Exception as _e_pro:
+        st.error(f"❌ Erro ao renderizar PROTEGE: {_e_pro}")
         import traceback
         st.code(traceback.format_exc(), language="python")
