@@ -223,7 +223,7 @@ def _chart_produto(
 
     df_tabela = pd.DataFrame({
         "": ["Qtd", "% AAK"],
-        **{label_tabela[i]: [qtd[i], f"{pct_aak[i]:.0f}%"]
+        **{label_tabela[i]: [str(qtd[i]), f"{pct_aak[i]:.0f}%"]
            for i in range(len(label_tabela))},
     })
 
@@ -361,8 +361,8 @@ def _chart_spf(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     df_tabela = pd.DataFrame({
         "": ["Total Spfs", "Spf Plus", "% AAK", "Aak Plus"],
         **{label_tabela[i]: [
-            total_spf[i],
-            spf_plus[i],
+            str(total_spf[i]),
+            str(spf_plus[i]),
             f"{pct_aak[i]:.0f}%",
             f"{pct_plus[i]:.0f}%",
         ] for i in range(len(label_tabela))},
