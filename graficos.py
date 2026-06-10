@@ -963,14 +963,14 @@ def _gerar_pdf(df: pd.DataFrame, aak_manual: dict) -> bytes:
     # ── Coleta todas as figuras ───────────────────────────────────────────────
     graficos = [
         ("CONTRATOS NV vs SN",  _chart_contratos_nv_sn(df)),
+        ("CONTRATOS E AAK",     _chart_contratos_aak(df, aak_manual=aak_manual or {})),
         ("GARANTIAS",           _chart_garantias(df)),
         ("SEGUROS",             _chart_seguros(df)),
-        ("SPF",                 _chart_spf(df)),
         ("PROTEGE",             _chart_protege(df)),
-        ("SEMPRE NOVO",         _chart_sempre_novo(df, aak_manual=aak_manual or {})),
+        ("SPF",                 _chart_spf(df)),
         ("TOTAL PONTOS",        _chart_pontos(df)),
         ("PONTOS POR CONTRATO", _chart_pontos_por_contrato(df)),
-        ("CONTRATOS E AAK",     _chart_contratos_aak(df, aak_manual=aak_manual or {})),
+        ("SEMPRE NOVO",         _chart_sempre_novo(df, aak_manual=aak_manual or {})),
     ]
 
     story = []
@@ -1163,168 +1163,7 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
     st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # Gráfico 2 — Garantias (Qtd + % AAK)
-    # ═══════════════════════════════════════════════════════════════════════════
-    try:
-        with st.container(border=True):
-            st.markdown(
-                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
-                "text-align:center;margin-bottom:2px'>GARANTIAS</p>",
-                unsafe_allow_html=True,
-            )
-            st.caption("Qtd de GE produzidas (barras, eixo esq.) · % AAK = GE / total contratos (linha, eixo dir.)")
-
-            fig2, tbl2 = _chart_garantias(df)
-            st.plotly_chart(fig2, use_container_width=True)
-            if not tbl2.empty:
-                st.dataframe(tbl2, use_container_width=True, hide_index=True,
-                             column_config={"": st.column_config.TextColumn("", width="medium")})
-    except Exception as _e_gar:
-        st.error(f"❌ Erro ao renderizar GARANTIAS: {_e_gar}")
-        st.code(traceback.format_exc(), language="python")
-
-    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Gráfico 3 — Seguros (Qtd + % AAK)
-    # ═══════════════════════════════════════════════════════════════════════════
-    try:
-        with st.container(border=True):
-            st.markdown(
-                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
-                "text-align:center;margin-bottom:2px'>SEGUROS</p>",
-                unsafe_allow_html=True,
-            )
-            st.caption("Qtd de Seguro VW produzidos (barras, eixo esq.) · % AAK = Seguro VW / total contratos (linha, eixo dir.)")
-
-            fig3, tbl3 = _chart_seguros(df)
-            st.plotly_chart(fig3, use_container_width=True)
-            if not tbl3.empty:
-                st.dataframe(tbl3, use_container_width=True, hide_index=True,
-                             column_config={"": st.column_config.TextColumn("", width="medium")})
-    except Exception as _e_seg:
-        st.error(f"❌ Erro ao renderizar SEGUROS: {_e_seg}")
-        st.code(traceback.format_exc(), language="python")
-
-    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Gráfico 4 — SPF (barras agrupadas Total vs Plus)
-    # ═══════════════════════════════════════════════════════════════════════════
-    try:
-        with st.container(border=True):
-            st.markdown(
-                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
-                "text-align:center;margin-bottom:2px'>SPF</p>",
-                unsafe_allow_html=True,
-            )
-            st.caption("Total SPF (azul) vs SPF Plus (laranja) · % AAK = Qtd / total contratos")
-
-            fig4, tbl4 = _chart_spf(df)
-            st.plotly_chart(fig4, use_container_width=True)
-            if not tbl4.empty:
-                st.dataframe(tbl4, use_container_width=True, hide_index=True,
-                             column_config={"": st.column_config.TextColumn("", width="medium")})
-    except Exception as _e_spf:
-        st.error(f"❌ Erro ao renderizar SPF: {_e_spf}")
-        st.code(traceback.format_exc(), language="python")
-
-    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Gráfico 5 — Protege (Qtd + % AAK)
-    # ═══════════════════════════════════════════════════════════════════════════
-    try:
-        with st.container(border=True):
-            st.markdown(
-                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
-                "text-align:center;margin-bottom:2px'>PROTEGE</p>",
-                unsafe_allow_html=True,
-            )
-            st.caption("Qtd de VW Protege produzidos (barras, eixo esq.) · % AAK = Protege / total contratos (linha, eixo dir.)")
-
-            fig5, tbl5 = _chart_protege(df)
-            st.plotly_chart(fig5, use_container_width=True)
-            if not tbl5.empty:
-                st.dataframe(tbl5, use_container_width=True, hide_index=True,
-                             column_config={"": st.column_config.TextColumn("", width="medium")})
-    except Exception as _e_pro:
-        st.error(f"❌ Erro ao renderizar PROTEGE: {_e_pro}")
-        st.code(traceback.format_exc(), language="python")
-
-    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Gráfico 5b — Sempre Novo (Qtd + % AAk vs AAK)
-    # ═══════════════════════════════════════════════════════════════════════════
-    try:
-        with st.container(border=True):
-            st.markdown(
-                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
-                "text-align:center;margin-bottom:2px'>SEMPRE NOVO</p>",
-                unsafe_allow_html=True,
-            )
-            st.caption("Qtd de Sempre Novo produzidos (barras, eixo esq.) · % AAk = Qtd / AAK do mês (linha, eixo dir.)")
-
-            fig5b, tbl5b = _chart_sempre_novo(df, aak_manual=_aak_load())
-            st.plotly_chart(fig5b, use_container_width=True)
-            if not tbl5b.empty:
-                st.dataframe(tbl5b, use_container_width=True, hide_index=True,
-                             column_config={"": st.column_config.TextColumn("", width="medium")})
-    except Exception as _e_sn:
-        st.error(f"❌ Erro ao renderizar SEMPRE NOVO: {_e_sn}")
-        st.code(traceback.format_exc(), language="python")
-
-    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Gráfico 6 — Total Pontos
-    # ═══════════════════════════════════════════════════════════════════════════
-    try:
-        with st.container(border=True):
-            st.markdown(
-                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
-                "text-align:center;margin-bottom:2px'>TOTAL PONTOS</p>",
-                unsafe_allow_html=True,
-            )
-            st.caption("Soma total de pontos por mês · TENDÊNCIA M.A = média dos últimos 3 meses completos")
-
-            fig6, tbl6 = _chart_pontos(df)
-            st.plotly_chart(fig6, use_container_width=True)
-            if not tbl6.empty:
-                st.dataframe(tbl6, use_container_width=True, hide_index=True,
-                             column_config={"": st.column_config.TextColumn("", width="medium")})
-    except Exception as _e_pts:
-        st.error(f"❌ Erro ao renderizar TOTAL PONTOS: {_e_pts}")
-        st.code(traceback.format_exc(), language="python")
-
-    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Gráfico 8 — Pontos por Contrato
-    # ═══════════════════════════════════════════════════════════════════════════
-    try:
-        with st.container(border=True):
-            st.markdown(
-                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
-                "text-align:center;margin-bottom:2px'>PONTOS POR CONTRATO</p>",
-                unsafe_allow_html=True,
-            )
-            st.caption("Média de pontos por contrato (barras) · META = 1,5 (linha laranja)")
-
-            fig8, tbl8 = _chart_pontos_por_contrato(df)
-            st.plotly_chart(fig8, use_container_width=True)
-            if not tbl8.empty:
-                st.dataframe(tbl8, use_container_width=True, hide_index=True,
-                             column_config={"": st.column_config.TextColumn("", width="medium")})
-    except Exception as _e_ppc:
-        st.error(f"❌ Erro ao renderizar PONTOS POR CONTRATO: {_e_ppc}")
-        st.code(traceback.format_exc(), language="python")
-
-    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Gráfico 7 — Contratos + AAK
+    # Gráfico 2 — Contratos + AAK
     # ═══════════════════════════════════════════════════════════════════════════
     try:
         _aak_atual = _aak_load()
@@ -1378,4 +1217,165 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
 
     except Exception as _e_aak:
         st.error(f"❌ Erro CONTRATOS E AAK: {_e_aak}")
+        st.code(traceback.format_exc(), language="python")
+
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Gráfico 3 — Garantias (Qtd + % AAK)
+    # ═══════════════════════════════════════════════════════════════════════════
+    try:
+        with st.container(border=True):
+            st.markdown(
+                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+                "text-align:center;margin-bottom:2px'>GARANTIAS</p>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Qtd de GE produzidas (barras, eixo esq.) · % AAK = GE / total contratos (linha, eixo dir.)")
+
+            fig2, tbl2 = _chart_garantias(df)
+            st.plotly_chart(fig2, use_container_width=True)
+            if not tbl2.empty:
+                st.dataframe(tbl2, use_container_width=True, hide_index=True,
+                             column_config={"": st.column_config.TextColumn("", width="medium")})
+    except Exception as _e_gar:
+        st.error(f"❌ Erro ao renderizar GARANTIAS: {_e_gar}")
+        st.code(traceback.format_exc(), language="python")
+
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Gráfico 4 — Seguros (Qtd + % AAK)
+    # ═══════════════════════════════════════════════════════════════════════════
+    try:
+        with st.container(border=True):
+            st.markdown(
+                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+                "text-align:center;margin-bottom:2px'>SEGUROS</p>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Qtd de Seguro VW produzidos (barras, eixo esq.) · % AAK = Seguro VW / total contratos (linha, eixo dir.)")
+
+            fig3, tbl3 = _chart_seguros(df)
+            st.plotly_chart(fig3, use_container_width=True)
+            if not tbl3.empty:
+                st.dataframe(tbl3, use_container_width=True, hide_index=True,
+                             column_config={"": st.column_config.TextColumn("", width="medium")})
+    except Exception as _e_seg:
+        st.error(f"❌ Erro ao renderizar SEGUROS: {_e_seg}")
+        st.code(traceback.format_exc(), language="python")
+
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Gráfico 5 — Protege (Qtd + % AAK)
+    # ═══════════════════════════════════════════════════════════════════════════
+    try:
+        with st.container(border=True):
+            st.markdown(
+                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+                "text-align:center;margin-bottom:2px'>PROTEGE</p>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Qtd de VW Protege produzidos (barras, eixo esq.) · % AAK = Protege / total contratos (linha, eixo dir.)")
+
+            fig5, tbl5 = _chart_protege(df)
+            st.plotly_chart(fig5, use_container_width=True)
+            if not tbl5.empty:
+                st.dataframe(tbl5, use_container_width=True, hide_index=True,
+                             column_config={"": st.column_config.TextColumn("", width="medium")})
+    except Exception as _e_pro:
+        st.error(f"❌ Erro ao renderizar PROTEGE: {_e_pro}")
+        st.code(traceback.format_exc(), language="python")
+
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Gráfico 6 — SPF (barras agrupadas Total vs Plus)
+    # ═══════════════════════════════════════════════════════════════════════════
+    try:
+        with st.container(border=True):
+            st.markdown(
+                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+                "text-align:center;margin-bottom:2px'>SPF</p>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Total SPF (azul) vs SPF Plus (laranja) · % AAK = Qtd / total contratos")
+
+            fig4, tbl4 = _chart_spf(df)
+            st.plotly_chart(fig4, use_container_width=True)
+            if not tbl4.empty:
+                st.dataframe(tbl4, use_container_width=True, hide_index=True,
+                             column_config={"": st.column_config.TextColumn("", width="medium")})
+    except Exception as _e_spf:
+        st.error(f"❌ Erro ao renderizar SPF: {_e_spf}")
+        st.code(traceback.format_exc(), language="python")
+
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Gráfico 7 — Total Pontos
+    # ═══════════════════════════════════════════════════════════════════════════
+    try:
+        with st.container(border=True):
+            st.markdown(
+                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+                "text-align:center;margin-bottom:2px'>TOTAL PONTOS</p>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Soma total de pontos por mês · TENDÊNCIA M.A = média dos últimos 3 meses completos")
+
+            fig6, tbl6 = _chart_pontos(df)
+            st.plotly_chart(fig6, use_container_width=True)
+            if not tbl6.empty:
+                st.dataframe(tbl6, use_container_width=True, hide_index=True,
+                             column_config={"": st.column_config.TextColumn("", width="medium")})
+    except Exception as _e_pts:
+        st.error(f"❌ Erro ao renderizar TOTAL PONTOS: {_e_pts}")
+        st.code(traceback.format_exc(), language="python")
+
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Gráfico 8 — Pontos por Contrato
+    # ═══════════════════════════════════════════════════════════════════════════
+    try:
+        with st.container(border=True):
+            st.markdown(
+                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+                "text-align:center;margin-bottom:2px'>PONTOS POR CONTRATO</p>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Média de pontos por contrato (barras) · META = 1,5 (linha laranja)")
+
+            fig8, tbl8 = _chart_pontos_por_contrato(df)
+            st.plotly_chart(fig8, use_container_width=True)
+            if not tbl8.empty:
+                st.dataframe(tbl8, use_container_width=True, hide_index=True,
+                             column_config={"": st.column_config.TextColumn("", width="medium")})
+    except Exception as _e_ppc:
+        st.error(f"❌ Erro ao renderizar PONTOS POR CONTRATO: {_e_ppc}")
+        st.code(traceback.format_exc(), language="python")
+
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Gráfico 9 — Sempre Novo (Qtd + % AAk vs AAK)
+    # ═══════════════════════════════════════════════════════════════════════════
+    try:
+        with st.container(border=True):
+            st.markdown(
+                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+                "text-align:center;margin-bottom:2px'>SEMPRE NOVO</p>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Qtd de Sempre Novo produzidos (barras, eixo esq.) · % AAk = Qtd / AAK do mês (linha, eixo dir.)")
+
+            fig5b, tbl5b = _chart_sempre_novo(df, aak_manual=_aak_load())
+            st.plotly_chart(fig5b, use_container_width=True)
+            if not tbl5b.empty:
+                st.dataframe(tbl5b, use_container_width=True, hide_index=True,
+                             column_config={"": st.column_config.TextColumn("", width="medium")})
+    except Exception as _e_sn:
+        st.error(f"❌ Erro ao renderizar SEMPRE NOVO: {_e_sn}")
         st.code(traceback.format_exc(), language="python")
