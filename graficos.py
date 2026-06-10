@@ -9,7 +9,7 @@ com a vantagem de serem interativos, filtráveis e sem dependência de sessão E
 from __future__ import annotations
 
 import json
-import os
+import traceback
 from datetime import datetime
 from pathlib import Path
 
@@ -125,16 +125,15 @@ def _chart_contratos_nv_sn(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     meses = _meses_range(6)
     hoje  = _periodo_atual()
 
-    if "tipo_veiculo" not in df.columns:
+    if "tipo_veiculo" not in df.columns or "data_pagto" not in df.columns:
         return _fig_sem_dados(
-            "Coluna tipo_veiculo não encontrada — clique em 🔄 para recarregar"
+            "Colunas tipo_veiculo / data_pagto não encontradas — clique em 🔄 para recarregar"
         ), pd.DataFrame()
 
     df_tipo = df[
         df["tipo_veiculo"].fillna("").str.strip().str.upper().isin(["N", "S"])
     ].copy()
-    df_tipo["_periodo"] = df_tipo["data_pagto"].dt.to_period("M") \
-        if "data_pagto" in df_tipo.columns else pd.NaT
+    df_tipo["_periodo"] = df_tipo["data_pagto"].dt.to_period("M")
 
     nv_vals: list[int] = []
     sn_vals: list[int] = []
@@ -907,7 +906,7 @@ def _chart_spf(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
 
 def _gerar_pdf(df: pd.DataFrame, aak_manual: dict) -> bytes:
     """
-    Gera um PDF landscape A4 com os 7 gráficos F&I.
+    Gera um PDF landscape A4 com os 9 gráficos F&I.
     Requer: kaleido (renderiza imagens) + reportlab (monta o PDF).
     """
     import io as _io
@@ -1126,8 +1125,7 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                     st.session_state["_pdf_bytes"] = _gerar_pdf(df, _aak_load())
                 except Exception as _e_pdf:
                     st.error(f"❌ Erro ao gerar PDF: {_e_pdf}")
-                    import traceback as _tb_pdf
-                    st.code(_tb_pdf.format_exc(), language="python")
+                    st.code(traceback.format_exc(), language="python")
     with _pdf_col2:
         if st.session_state.get("_pdf_bytes"):
             st.download_button(
@@ -1144,19 +1142,23 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
     # ═══════════════════════════════════════════════════════════════════════════
     # Gráfico 1 — Contratos NV vs SN
     # ═══════════════════════════════════════════════════════════════════════════
-    with st.container(border=True):
-        st.markdown(
-            "<p style='font-size:1rem;font-weight:700;color:#001e50;"
-            "text-align:center;margin-bottom:2px'>CONTRATOS</p>",
-            unsafe_allow_html=True,
-        )
-        st.caption("Últimos 5 meses completos + mês vigente + Tendência M.A (média 3M)")
+    try:
+        with st.container(border=True):
+            st.markdown(
+                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+                "text-align:center;margin-bottom:2px'>CONTRATOS</p>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Últimos 5 meses completos + mês vigente + Tendência M.A (média 3M)")
 
-        fig1, tbl1 = _chart_contratos_nv_sn(df)
-        st.plotly_chart(fig1, use_container_width=True)
-        if not tbl1.empty:
-            st.dataframe(tbl1, use_container_width=True, hide_index=True,
-                         column_config={"": st.column_config.TextColumn("", width="medium")})
+            fig1, tbl1 = _chart_contratos_nv_sn(df)
+            st.plotly_chart(fig1, use_container_width=True)
+            if not tbl1.empty:
+                st.dataframe(tbl1, use_container_width=True, hide_index=True,
+                             column_config={"": st.column_config.TextColumn("", width="medium")})
+    except Exception as _e_ct:
+        st.error(f"❌ Erro ao renderizar CONTRATOS: {_e_ct}")
+        st.code(traceback.format_exc(), language="python")
 
     st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
 
@@ -1179,7 +1181,6 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                              column_config={"": st.column_config.TextColumn("", width="medium")})
     except Exception as _e_gar:
         st.error(f"❌ Erro ao renderizar GARANTIAS: {_e_gar}")
-        import traceback
         st.code(traceback.format_exc(), language="python")
 
     st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
@@ -1203,7 +1204,6 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                              column_config={"": st.column_config.TextColumn("", width="medium")})
     except Exception as _e_seg:
         st.error(f"❌ Erro ao renderizar SEGUROS: {_e_seg}")
-        import traceback
         st.code(traceback.format_exc(), language="python")
 
     st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
@@ -1227,7 +1227,6 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                              column_config={"": st.column_config.TextColumn("", width="medium")})
     except Exception as _e_spf:
         st.error(f"❌ Erro ao renderizar SPF: {_e_spf}")
-        import traceback
         st.code(traceback.format_exc(), language="python")
 
     st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
@@ -1251,7 +1250,6 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                              column_config={"": st.column_config.TextColumn("", width="medium")})
     except Exception as _e_pro:
         st.error(f"❌ Erro ao renderizar PROTEGE: {_e_pro}")
-        import traceback
         st.code(traceback.format_exc(), language="python")
 
     st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
@@ -1259,16 +1257,14 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
     # ═══════════════════════════════════════════════════════════════════════════
     # Gráfico 5b — Sempre Novo (Qtd + % AAk vs AAK)
     # ═══════════════════════════════════════════════════════════════════════════
-    # Marcador externo — aparece mesmo que o container interno falhe
-    st.markdown(
-        "<p style='font-size:1rem;font-weight:700;color:#001e50;"
-        "text-align:center;margin-bottom:2px'>SEMPRE NOVO</p>",
-        unsafe_allow_html=True,
-    )
     try:
         with st.container(border=True):
+            st.markdown(
+                "<p style='font-size:1rem;font-weight:700;color:#001e50;"
+                "text-align:center;margin-bottom:2px'>SEMPRE NOVO</p>",
+                unsafe_allow_html=True,
+            )
             st.caption("Qtd de Sempre Novo produzidos (barras, eixo esq.) · % AAk = Qtd / AAK do mês (linha, eixo dir.)")
-            st.caption(f"DEBUG colunas: {[c for c in df.columns if 'sempre' in c.lower() or 'novo' in c.lower()]}")
 
             fig5b, tbl5b = _chart_sempre_novo(df, aak_manual=_aak_load())
             st.plotly_chart(fig5b, use_container_width=True)
@@ -1277,7 +1273,6 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                              column_config={"": st.column_config.TextColumn("", width="medium")})
     except Exception as _e_sn:
         st.error(f"❌ Erro ao renderizar SEMPRE NOVO: {_e_sn}")
-        import traceback
         st.code(traceback.format_exc(), language="python")
 
     st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
@@ -1301,7 +1296,6 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                              column_config={"": st.column_config.TextColumn("", width="medium")})
     except Exception as _e_pts:
         st.error(f"❌ Erro ao renderizar TOTAL PONTOS: {_e_pts}")
-        import traceback
         st.code(traceback.format_exc(), language="python")
 
     st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
@@ -1325,7 +1319,6 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                              column_config={"": st.column_config.TextColumn("", width="medium")})
     except Exception as _e_ppc:
         st.error(f"❌ Erro ao renderizar PONTOS POR CONTRATO: {_e_ppc}")
-        import traceback
         st.code(traceback.format_exc(), language="python")
 
     st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
@@ -1334,7 +1327,6 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
     # Gráfico 7 — Contratos + AAK
     # ═══════════════════════════════════════════════════════════════════════════
     try:
-        import traceback as _tb7
         _aak_atual = _aak_load()
 
         with st.container(border=True):
@@ -1375,7 +1367,7 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                         st.rerun()
             except Exception as _e_exp:
                 st.warning(f"⚠️ Expander AAK: {_e_exp}")
-                st.code(_tb7.format_exc(), language="python")
+                st.code(traceback.format_exc(), language="python")
 
             # ── Gráfico e tabela ──────────────────────────────────────────────
             fig7, tbl7 = _chart_contratos_aak(df, aak_manual=_aak_atual)
@@ -1385,6 +1377,5 @@ def render_graficos(client_id: str = "", sharing_url: str = "") -> None:
                              column_config={"": st.column_config.TextColumn("", width="medium")})
 
     except Exception as _e_aak:
-        import traceback as _tb7
         st.error(f"❌ Erro CONTRATOS E AAK: {_e_aak}")
-        st.code(_tb7.format_exc(), language="python")
+        st.code(traceback.format_exc(), language="python")
