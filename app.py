@@ -321,13 +321,27 @@ def produto_para_linha_avulso(item: dict) -> list:
 
 # ─── Extração via Gemini API ───────────────────────────────────────────────────
 
+def _filtrar_paginas(pdf_bytes: bytes) -> bytes:
+    """Remove páginas 3-8 (boilerplate de diretrizes) antes de enviar ao Gemini."""
+    from pypdf import PdfReader, PdfWriter
+    import io
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    writer = PdfWriter()
+    for i, page in enumerate(reader.pages):
+        if i < 2 or i > 7:   # mantém páginas 1-2 e 9 em diante
+            writer.add_page(page)
+    buf = io.BytesIO()
+    writer.write(buf)
+    return buf.getvalue()
+
+
 def extrair_contrato(pdf_bytes: bytes, api_key: str) -> dict:
     client = genai.Client(api_key=api_key)
 
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=[
-            types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
+            types.Part.from_bytes(data=_filtrar_paginas(pdf_bytes), mime_type="application/pdf"),
             EXTRACTION_PROMPT,
         ],
     )
