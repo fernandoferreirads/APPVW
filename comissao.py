@@ -88,28 +88,38 @@ PRODUCT_COLS: dict[str, str] = {
 #   V(21)=tipo_veiculo (N/S)  W(22)=sempre_novo
 
 _BIGBASE_SPEC: list[tuple[str, list[str], int | None]] = [
-    ("proposta",         ["PROPOSTA", "N PROPOSTA", "NUM PROPOSTA"],          0),
-    ("equipe",           ["EQUIPE", "LOJA", "LOJA/EQUIPE"],                   1),
-    ("data_pagto",       ["D. PAGTO","DATA","DATA PAGTO","DT PAGTO",
-                          "D.PAGTO","DATA PAGAMENTO","DATA DE PAGAMENTO"],     6),
-    ("spf",              ["SPF","SPF/SEGURO","SEGURO PROT FINANCEIRA"],       12),
-    ("app",              ["APP","ACID PESSOAIS","ACIDENTE PESSOAL"],          13),
-    ("gap",              ["GAP"],                                             14),
-    ("franquia",         ["FRANQ","FRANQUIA","SEGURO FRANQUIA"],              15),
-    ("rev_plan",         ["REV PLAN","REV_PLAN","REVISAO","REVISÃO"],         16),
-    ("ge",               ["GE","GARANTIA","GARANTIA ESTENDIDA"],              17),
-    ("protege",          ["PROTEGE","VW PROTEGE"],                            18),
-    ("tipo_veiculo",     ["N/S","N / S","TIPO","TIPO VEICULO","TIPO_VEICULO",
-                          "TIPO VEI","NOVO/SEMI","NOVO / SEMI"],              21),
-    ("sempre_novo",      ["SEMPRE NV","SEMPRE NOVO","SEMPRE_NV"],             22),
-    ("vendedor",         ["VENDEDOR","CONSULTOR","NOME VENDEDOR"],            24),
-    ("retorno",          ["RETORNO","RETORNO3","RETORNO 3","RETORNO F&I"],    25),
-    ("cliente",          ["CLIENTE","NOME CLIENTE","RAZAO SOCIAL"],          None),
-    ("cpf_cnpj",         ["CPF/CNPJ","CPF","CNPJ","DOCUMENTO"],             None),
-    ("valor_financiado", ["VALOR FINANCIADO","VL FINANCIADO"],               None),
-    ("pontos",           ["PONTOS","PONTOS POR CONTRATOS",
-                          "P/CONTRATO REAL","P/ CONTRATO REAL",
-                          "PONTOS/CONTRATO","PONTO/CONTRATO"],               None),
+    # Posições baseadas na aba BASE_PAGAMENTOS (colunas A–W)
+    ("proposta",         ["PROPOSTA", "N PROPOSTA", "NUM PROPOSTA"],           0),
+    ("equipe",           ["EQUIPE", "LOJA", "LOJA/EQUIPE"],                    1),
+    ("data_pagto",       ["DATA_PAGAMENTO","DATA PAGAMENTO","D. PAGTO",
+                          "DATA PAGTO","DT PAGTO","D.PAGTO",
+                          "DATA DE PAGAMENTO"],                                2),
+    ("cpf_cnpj",         ["CPF_CNPJ","CPF/CNPJ","CPF","CNPJ","DOCUMENTO"],    3),
+    ("cliente",          ["CLIENTE","NOME CLIENTE","RAZAO SOCIAL"],            4),
+    ("valor_veiculo",    ["VALOR_VEICULO","VALOR VEICULO","VR. VEICULO",
+                          "VR VEICULO","VL VEICULO"],                          5),
+    ("entrada",          ["ENTRADA","VR. ENTRADA","VL ENTRADA"],               6),
+    ("valor_financiado", ["VALOR_FINANCIADO","VALOR FINANCIADO",
+                          "VL FINANCIADO"],                                    7),
+    ("spf",              ["SPF","SPF/SEGURO","SEGURO PROT FINANCEIRA"],        8),
+    ("app",              ["AP","APP","ACID PESSOAIS","ACIDENTE PESSOAL"],      9),
+    ("gap",              ["GAP"],                                              10),
+    ("franquia",         ["FRANQUIA","FRANQ","SEGURO FRANQUIA"],               11),
+    ("rev_plan",         ["REVISAO_PLANEJADA","REVISAO PLANEJADA","REV PLAN",
+                          "REV_PLAN","REVISAO","REVISÃO"],                     12),
+    ("ge",               ["GE","GARANTIA","GARANTIA ESTENDIDA"],               13),
+    ("protege",          ["PROTEGE","VW PROTEGE"],                             14),
+    ("prazo",            ["PRAZO"],                                            15),
+    ("taxa",             ["TAXA"],                                             16),
+    ("tipo_veiculo",     ["N_S","N/S","N / S","TIPO","TIPO VEICULO",
+                          "TIPO_VEICULO","TIPO VEI","NOVO/SEMI","NOVO / SEMI"],17),
+    ("sempre_novo",      ["SEMPRE_NOVO","SEMPRE NV","SEMPRE NOVO",
+                          "SEMPRE_NV"],                                        18),
+    ("peso_tabela",      ["PESO_TABELA","PESO TABELA","PESO"],                 19),
+    ("vendedor",         ["VENDEDOR","CONSULTOR","NOME VENDEDOR"],             20),
+    ("retorno",          ["RETORNO","RETORNO3","RETORNO 3","RETORNO F&I"],     21),
+    ("pontos",           ["PONTOS_POR_CONTRATO","PONTOS POR CONTRATO",
+                          "PONTOS","P/CONTRATO REAL","PONTOS/CONTRATO"],       22),
 ]
 
 
@@ -155,7 +165,7 @@ def _build_bigbase_df(values: list[list]) -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
-_BIGBASE_TAB  = "BIGBASE"
+_BIGBASE_TAB  = "BASE_PAGAMENTOS"
 _CACHE_TTL    = 300   # segundos (5 min)
 
 

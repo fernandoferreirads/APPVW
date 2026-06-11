@@ -20,22 +20,33 @@ requirements.txt
 
 ## BIGBASE — Mapeamento de Colunas (`_BIGBASE_SPEC` em comissao.py)
 
+Aba: `BASE_PAGAMENTOS` (23 colunas A–W)
+
 | Nome interno | Aliases (cabeçalho Excel) | Posição (0-idx) | Coluna Excel |
 |---|---|---|---|
 | `proposta` | PROPOSTA, N PROPOSTA | 0 | A |
 | `equipe` | EQUIPE, LOJA | 1 | B |
-| `data_pagto` | D. PAGTO, DATA PAGTO | 6 | G |
-| `spf` | SPF, SEGURO PROT FINANCEIRA | 12 | M |
-| `app` | APP, ACID PESSOAIS | 13 | N |
-| `gap` | GAP | 14 | O |
-| `franquia` | FRANQ, FRANQUIA | 15 | P |
-| `rev_plan` | REV PLAN, REVISAO | 16 | Q |
-| `ge` | GE, GARANTIA ESTENDIDA | 17 | R |
-| `protege` | PROTEGE, VW PROTEGE | 18 | S |
-| `tipo_veiculo` | N/S, TIPO VEICULO | 21 | V |
-| `sempre_novo` | SEMPRE NV, SEMPRE NOVO | 22 | W |
-| `vendedor` | VENDEDOR, CONSULTOR | 24 | Y |
-| `retorno` | RETORNO, RETORNO F&I | 25 | Z |
+| `data_pagto` | DATA_PAGAMENTO, DATA PAGAMENTO | 2 | C |
+| `cpf_cnpj` | CPF_CNPJ, CPF/CNPJ | 3 | D |
+| `cliente` | CLIENTE, NOME CLIENTE | 4 | E |
+| `valor_veiculo` | VALOR_VEICULO, VALOR VEICULO | 5 | F |
+| `entrada` | ENTRADA, VR. ENTRADA | 6 | G |
+| `valor_financiado` | VALOR_FINANCIADO, VALOR FINANCIADO | 7 | H |
+| `spf` | SPF, SEGURO PROT FINANCEIRA | 8 | I |
+| `app` | AP, APP, ACID PESSOAIS | 9 | J |
+| `gap` | GAP | 10 | K |
+| `franquia` | FRANQUIA, FRANQ | 11 | L |
+| `rev_plan` | REVISAO_PLANEJADA, REV PLAN | 12 | M |
+| `ge` | GE, GARANTIA ESTENDIDA | 13 | N |
+| `protege` | PROTEGE, VW PROTEGE | 14 | O |
+| `prazo` | PRAZO | 15 | P |
+| `taxa` | TAXA | 16 | Q |
+| `tipo_veiculo` | N_S, N/S, TIPO VEICULO | 17 | R |
+| `sempre_novo` | SEMPRE_NOVO, SEMPRE NOVO | 18 | S |
+| `peso_tabela` | PESO_TABELA, PESO TABELA | 19 | T |
+| `vendedor` | VENDEDOR, CONSULTOR | 20 | U |
+| `retorno` | RETORNO, RETORNO F&I | 21 | V |
+| `pontos` | PONTOS_POR_CONTRATO, PONTOS | 22 | W |
 
 ---
 
