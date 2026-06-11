@@ -1182,24 +1182,7 @@ with _tab_c:
     </style>
     """, unsafe_allow_html=True)
 
-    _meses_opcoes = _ultimos_meses(6)
-
-    with st.container():
-        col_label, col_sel = st.columns([1, 3])
-        with col_label:
-            st.markdown(
-                "<div style='padding-top:8px;color:#001e50;font-weight:600;"
-                "font-size:0.9rem;'>📅 Aba de destino</div>",
-                unsafe_allow_html=True,
-            )
-        with col_sel:
-            aba_selecionada = st.selectbox(
-                "Aba de destino",
-                options=_meses_opcoes,
-                index=0,
-                key="aba_destino",
-                label_visibility="collapsed",
-            )
+    aba_selecionada = "BASE_PAGAMENTOS"
 
     # Chave dinâmica — incrementar força o uploader a resetar (limpar arquivos)
     if "_uploader_key" not in st.session_state:
@@ -1387,22 +1370,7 @@ with _tab_c:
     if "avulso_items" not in st.session_state:
         st.session_state["avulso_items"] = []
 
-    # Seletor de aba de destino — visível sempre, antes do formulário
-    col_av_label, col_av_sel, _ = st.columns([1, 2, 2])
-    with col_av_label:
-        st.markdown(
-            "<div style='padding-top:8px;color:#001e50;font-weight:600;"
-            "font-size:0.9rem;'>📅 Aba de destino</div>",
-            unsafe_allow_html=True,
-        )
-    with col_av_sel:
-        aba_selecionada_av = st.selectbox(
-            "Aba avulso",
-            options=_meses_opcoes,
-            index=0,
-            key="aba_destino_av",
-            label_visibility="collapsed",
-        )
+    aba_selecionada_av = "BASE_PAGAMENTOS"
 
     # Formulário de entrada
     with st.container(border=True):
