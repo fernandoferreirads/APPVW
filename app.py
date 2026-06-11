@@ -1041,9 +1041,9 @@ with st.popover("⚙️  Configurações"):
         key="cfg_excel_url",
     )
     dash_url = st.text_input(
-        "Link do Excel — Dashboard (OneDrive)",
+        "Link do Excel — BIGBASE (OneDrive)",
         value=_dash_url_default,
-        help="OneDrive → abrir o arquivo do Dashboard → Compartilhar → Copiar link",
+        help="OneDrive → abrir o arquivo BIGBASE → Compartilhar → Copiar link",
         key="cfg_dash_url",
     )
     st.divider()
@@ -1146,8 +1146,8 @@ with st.popover("⚙️  Configurações"):
     if not excel_ok and _auth_st not in ("pending", "checking", "authenticated"):
         st.caption("💡 Preencha o Client ID, o link do Excel e faça login para inserir dados.")
 
-_tab_c, _tab_d, _tab_com, _tab_graf = st.tabs([
-    "📋  Contratos", "📊  Dashboard", "💰  Comissão", "📈  Gráficos",
+_tab_c, _tab_com, _tab_graf = st.tabs([
+    "📋  Contratos", "💰  Comissão", "📈  Gráficos",
 ])
 
 with _tab_c:
@@ -1526,10 +1526,6 @@ with _tab_c:
                         st.balloons()
                     except Exception as e:
                         st.error(f"❌ Erro ao inserir: {e}")
-
-with _tab_d:
-    from dashboard import render_dashboard as _render_dash
-    _render_dash(az_client_id, dash_url)
 
 with _tab_com:
     from comissao import render_comissao as _render_comm
