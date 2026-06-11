@@ -619,7 +619,7 @@ def _fazer_insercao(
     Em caso de erro de sessão expirada, invalida e repropaga."""
     linha_ini = _proxima_linha_excel(base_url, hdrs)
     n         = len(linhas)
-    address   = f"A{linha_ini}:AB{linha_ini + n - 1}"
+    address   = f"A{linha_ini}:W{linha_ini + n - 1}"
     r = requests.patch(
         f"{base_url}/range(address='{address}')",
         headers=hdrs,
@@ -633,7 +633,7 @@ def _fazer_insercao(
     if colorir_map:
         def _colorir(row: int, cor: str) -> None:
             requests.patch(
-                f"{base_url}/range(address='A{row}:AB{row}')/format/fill",
+                f"{base_url}/range(address='A{row}:W{row}')/format/fill",
                 headers=hdrs,
                 json={"color": cor},
                 timeout=15,
