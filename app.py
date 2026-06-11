@@ -30,74 +30,40 @@ MESES_PT = {
 }
 
 VENDEDOR_EQUIPE = {
-    # ── VW S.I.A ──────────────────────────────────────────────────────────────
-    "ALBERT ALVES TORRES":              "S.I.A",
-    "CATARINA GUEDES":                  "S.I.A",
-    "CLAUDIO HENRIQUE":                 "S.I.A",
-    "CLINSMAN WILKE DE VASCONCELOS":    "S.I.A",
-    "GABRIEL DA SILVA ALMEIDA BARBOSA": "S.I.A",
-    "JOSE PEREIRA NEVES":               "S.I.A",
-    "LARISSA OLIVEIRA":                 "S.I.A",
-    "LEANDRO MATOS CABRAL":             "S.I.A",
-    "NEY SANTOS CERQUEIRA":             "S.I.A",
-    "RENATO MENDES":                    "S.I.A",
-    "RODRIGO SANTANA":                  "S.I.A",
-    "SABRINA ALMEIDA VIANA":            "S.I.A",
-    "YNGRID KAREN":                     "S.I.A",
-    # ── VW CEI ────────────────────────────────────────────────────────────────
-    "ALEX MOREIRA SOUZA":               "CEI VW",
-    "EDUARDO ALVES ROQUE":              "CEI VW",
-    "JOAO MARCOS":                      "CEI VW",
-    "LUCAS DOS SANTOS LOBO":            "CEI VW",
-    "THIAGO GOMES DA SILVA":            "CEI VW",
-    # ── VW TAG ────────────────────────────────────────────────────────────────
-    "ANDRE LUIZ FONTANA DE PAIVA":      "TAG VW",
-    "BRUNO FREITAS OLIVEIRA":           "TAG VW",
-    "DANUBIA CANUTO":                   "TAG VW",
-    "DIOGO ELLER DA SILVA NASCIMENTO":  "TAG VW",
-    "EDUARDO DOS SANTOS CAMPOS":        "TAG VW",
-    "FABIANO CARVALHO DOS":             "TAG VW",
-    "FABRICIO SILVA DE MORAIS":         "TAG VW",
-    "IVANDA FERREIRA PINTO":            "TAG VW",
-    "JOAB SANTIAGO":                    "TAG VW",
-    "MARCELO FERREIRA BOMFIN":          "TAG VW",
-    "MICHELL GONÇALO":                  "TAG VW",
-    # ── FORD EPIA ─────────────────────────────────────────────────────────────
-    "ALEXANDRE HENRIQUE M":             "FORD EPIA",
-    "CARLUCIA SANTOS FERN":             "FORD EPIA",
-    "ELCIO GUSTAVO R MENDES":           "FORD EPIA",
-    "FABIO RODRIGUES SILVA":            "FORD EPIA",
-    "IANCA":                            "FORD EPIA",
-    "MOISES DA SILVA LIRA":             "FORD EPIA",
-    "RODRIGO ALESSANDRO":               "FORD EPIA",
-    "TANIZZE BATISTA":                  "FORD EPIA",
-    "UEVERSON DENIS GERMANO SANTANA":   "FORD EPIA",
-    "UILLIAN MARRA SILVA":              "FORD EPIA",
-    # ── FORD TAG ──────────────────────────────────────────────────────────────
-    "EUCARLITO GEOVANI DA SILVA":       "FORD TAG",
-    "FABIO TAVARES":                    "FORD TAG",
-    "FERNANDO BARBOSA ALBUQUERQUE":     "FORD TAG",
-    "LEONARDO PEREIRA LIMA MORAIS":     "FORD TAG",
-    "LILIAN AMARAL":                    "FORD TAG",
-    "WILCK JORGE COSTA MEDEIROS":       "FORD TAG",
-    "WILLIAM DA SILVA QUEIROZ":         "FORD TAG",
-    # ── NP (Não Presencial) ───────────────────────────────────────────────────
-    "AMAURI RODRIGUES DOS SANTOS":      "NÃO PRESENCIAL",
-    "BRENO FELIPE CAVALCANTE":          "NÃO PRESENCIAL",
-    "DANILO DA ROCHA NEVES":            "NÃO PRESENCIAL",
-    "FLAVIO PEREIRA DE SOUZA":          "NÃO PRESENCIAL",
-    "JAME WILLIAMS":                    "NÃO PRESENCIAL",
-    "RODRIGO DA SILVA PAZ":             "NÃO PRESENCIAL",
+    # ── VW SIA ────────────────────────────────────────────────────────────────
+    "ALBERT ALVES TORRES":                    "VW SIA",
+    "CATARINA GUEDES FERNANDES":              "VW SIA",
+    "CLAUDIO HENRIQUE RODRIGUES CABRAL":      "VW SIA",
+    "CLINSMAN WILKE DE VASCONCELOS":          "VW SIA",
+    "FRANCISCO RICLEY DE SOUSA CARVALHO":     "VW SIA",
+    "GABRIEL DA SILVA ALMEIDA BARBOSA":       "VW SIA",
+    "HARLEN GOMES BORGES":                    "VW SIA",
+    "HARLEN BORGES GOMES":                    "VW SIA",
+    "JOSE PEREIRA NEVES":                     "VW SIA",
+    "LARISSA OLIVEIRA LIMA":                  "VW SIA",
+    "LEANDRO MATOS CABRAL":                   "VW SIA",
+    "LUCAS LEONARDO DOS SANTOS ARAUJO":       "VW SIA",
+    "MARCUS VINICIUS RODRIGUES LOPES":        "VW SIA",
+    "NEY SANTOS CERQUEIRA":                   "VW SIA",
+    "RENATO MENDES ARAUJO SANTOS":            "VW SIA",
+    "RODRIGO HERCULANO TORRES SANTANA":       "VW SIA",
+    "SABRINA ALMEIDA VIANA":                  "VW SIA",
+    "YNGRID KAREN BATISTA DE FREITAS":        "VW SIA",
+    # ── NP ────────────────────────────────────────────────────────────────────
+    "AMAURI RODRIGUES DOS SANTOS":            "NP",
+    "DANILO DA ROCHA NEVES":                  "NP",
+    "FLAVIO PEREIRA DE SOUZA":                "NP",
+    "JAME WILLIAMS DA SILVA COSTA":           "NP",
+    "RODRIGO DA SILVA PAZ":                   "NP",
+    "THIAGO TORRES DA SILVA GOUVES":          "NP",
     # ── SN ────────────────────────────────────────────────────────────────────
-    "ANTONINO VITORINO DE SOUSA":       "S.N",
-    "DOUGLAS OLIVEIRA DE MORAIS":       "S.N",
-    "EVERTON ANICESIO VELOSO":          "S.N",
-    "GRAZIELLE SANTOS LIMA":            "S.N",
-    "MARCUS VINICIUS RODRIGUES LOPES":  "S.N",
-    "PEDRO HENRIQUE SOARES DUTRA":      "S.N",
-    "THOMAS RAVELLI":                   "S.N",
-    # ── Sem equipe definida no PDF (mantidos por precaução) ───────────────────
-    "THIAGO BATISTA GOMES":             "S.I.A",
+    "ANTONINO VITORINO DE SOUSA":             "SN",
+    "DOUGLAS OLIVEIRA DE MORAIS":             "SN",
+    "EDUARDO ALVES ROQUE":                    "SN",
+    "EVERTON ANICESIO VELOSO":                "SN",
+    "GRAZIELLE SANTOS LIMA":                  "SN",
+    "PEDRO HENRIQUE SOARES DUTRA":            "SN",
+    "THOMAS RAVELLI RODRIGUES DE GODOI":      "SN",
 }
 
 PONTOS_PRODUTO = {
@@ -147,10 +113,10 @@ REGRAS DE EXTRAÇÃO:
    Exemplo: "14469703". NÃO inclua sufixos como "V.002".
 
 2. vendedor: nome IMPRESSO (não assinatura) abaixo de "ASSINATURA DO RESPONSÁVEL PELA ABERTURA DO CADASTRO"
-   na página "FICHA CADASTRAL - PESSOA FÍSICA". Retorne em maiúsculas.
+   na página "FICHA CADASTRAL - PESSOA FÍSICA". Retorne em MAIÚSCULAS.
 
 3. cpf_cnpj: em "I- EMITENTE", campo CPF/CNPJ (lado direito), com pontuação original (pontos, traços, barras).
-   ATENÇÃO: copie o número COMPLETO incluindo todos os dígitos. CPF tem 11 dígitos (ex: 830.606.501-87). Não omita nenhum dígito do início.
+   ATENÇÃO: copie o número COMPLETO incluindo todos os dígitos. CPF tem 11 dígitos (ex: 830.606.501-87).
 
 4. cliente: em "I- EMITENTE", campo "Nome / Razão Social". Nome completo.
 
@@ -161,11 +127,11 @@ REGRAS DE EXTRAÇÃO:
 
 7. spf: em "QUADRO 4", linha "Seguro de Proteção Financeira":
    - Não contratado → null
-   - Contratado → localize a página "SEGURO DE PROTEÇÃO FINANCEIRA + PERDA DE RENDA ___"
-     A palavra após RENDA indica o tipo: PLUS, NORMAL ou BÁSICO/BASICO.
+   - Contratado → localize a página com título "SEGURO DE PROTEÇÃO FINANCEIRA + PERDA DE RENDA ___".
+     A palavra que preenche o espaço após "RENDA" indica o tipo: PLUS, NORMAL ou BÁSICO/BASICO.
    - Retorne exatamente: "SPF PLUS", "SPF NORMAL" ou "SPF BASICO". Null se não contratado.
 
-8. app: "Acidentes Pessoais" no QUADRO 4 — contratado → "AP", senão null.
+8. ap: "Acidentes Pessoais" no QUADRO 4 — contratado → "AP", senão null.
 
 9. gap: "GAP" no QUADRO 4 — contratado → "GAP", senão null.
 
@@ -177,11 +143,12 @@ REGRAS DE EXTRAÇÃO:
       * valor < 1100 → "GE 1"
       * 1100 ≤ valor ≤ 2000 → "GE 2"
       * valor > 2000 → "GE 4"
-    IMPORTANTE: GE 3 NÃO EXISTE. Nunca retorne "GE 3".
+    IMPORTANTE: "GE 3" NÃO EXISTE. Nunca retorne "GE 3".
 
 12. protege: no QUADRO 3 (ACESSÓRIOS/PEÇAS/SERVIÇOS), produto PROTEGE/proteção veicular:
     - Não contratado → null
-    - Contratado, verifique o valor: 699 → "PROTEGE BAS 24" | 999 → "PROTEGE BAS 36"
+    - Contratado, verifique o valor:
+      699 → "PROTEGE BAS 24" | 999 → "PROTEGE BAS 36"
       1399 → "PROTEGE PLUS 24" | 1699 → "PROTEGE PLUS 36"
 
 13. prazo: em "QUADRO 5", "Prazo da CÉDULA" em Meses. Retorne como inteiro.
@@ -189,12 +156,13 @@ REGRAS DE EXTRAÇÃO:
 14. taxa: em "QUADRO 1 - VEÍCULO FINANCIADO", "Taxa de juros ao mês prefixados e capitalizados".
     Retorne como float com ponto decimal (ex: 0.99 para 0,99%).
 
-15. tipo_veiculo: em "QUADRO 1", qual opção está marcada:
+15. n_s: em "QUADRO 1", qual opção está marcada:
     Novo(N) → "N" | Semi-Novo(SN) → "S" | Usado(U) → "U"
 
 16. sempre_novo: em "QUADRO 7 – FLUXO DE PRESTAÇÕES PERIÓDICAS E INTERMEDIÁRIAS":
-    Se a última parcela (número mais alto) tiver valor significativamente maior que as demais → "S"
-    Se todas as parcelas forem iguais ou aproximadamente iguais → "N"
+    Analise os valores de todas as parcelas.
+    Se a última parcela (de número mais alto) tiver valor significativamente maior que as demais → "SMP NV"
+    Se todas as parcelas forem iguais ou aproximadamente iguais → null
 
 Retorne APENAS este JSON:
 {
@@ -205,15 +173,15 @@ Retorne APENAS este JSON:
   "valor_veiculo": 0.0,
   "entrada": 0.0,
   "spf": null,
-  "app": null,
+  "ap": null,
   "gap": null,
   "franquia": null,
   "ge": null,
   "protege": null,
   "prazo": 0,
   "taxa": 0.0,
-  "tipo_veiculo": "N",
-  "sempre_novo": "N"
+  "n_s": "N",
+  "sempre_novo": null
 }"""
 
 
@@ -246,7 +214,7 @@ def calcular_peso(tipo: str, taxa: float) -> float:
 
 def calcular_pontos(raw: dict) -> float:
     total = 0.0
-    for campo in ["spf", "app", "gap", "franquia", "ge", "protege"]:
+    for campo in ["spf", "ap", "gap", "franquia", "ge", "protege"]:
         prod = raw.get(campo)
         if prod:
             total += PONTOS_PRODUTO.get(prod, 0.0)
@@ -257,7 +225,7 @@ def aplicar_regras(raw: dict, data_upload: str) -> dict:
     veiculo = raw["valor_veiculo"]
     entrada = raw["entrada"]
     taxa = raw["taxa"]
-    tipo = raw["tipo_veiculo"]
+    tipo = raw["n_s"]
     vendedor = raw["vendedor"]
 
     equipe = lookup_vendedor(vendedor)
@@ -266,69 +234,59 @@ def aplicar_regras(raw: dict, data_upload: str) -> dict:
     retorno = round(valor_financiado * 0.004, 2)
     pontos = calcular_pontos(raw)
 
-    ge = raw.get("ge") or ""
-    ge_pts = PONTOS_PRODUTO.get(ge, "") if ge else ""
     taxa_str = f"{taxa:.2f}".replace(".", ",") + "%"
 
     return {
-        "proposta":             raw["proposta"],
-        "equipe":               equipe,
-        "data_pagto":           data_upload,
-        "cpf_cnpj":             raw["cpf_cnpj"],
-        "cliente":              raw["cliente"],
-        "valor_veiculo":        veiculo,
-        "entrada":              entrada,
-        "valor_financiado":     valor_financiado,
-        "spf":                  raw.get("spf") or "",
-        "app":                  raw.get("app") or "",
-        "gap":                  raw.get("gap") or "",
-        "franquia":             raw.get("franquia") or "",
-        "ge":                   ge,
-        "protege":              raw.get("protege") or "",
-        "prazo":                raw["prazo"],
-        "taxa":                 taxa_str,
-        "tipo_veiculo":         tipo,
-        "sempre_novo":          raw["sempre_novo"],
-        "peso_tabela":          peso,
-        "vendedor":             vendedor,
-        "retorno":              retorno,
-        "pontos":               pontos,
-        "correspondencias_ge":  ge,
-        "correspondencias_pts": ge_pts,
-        "loja":                 equipe,
+        "proposta":         raw["proposta"],
+        "equipe":           equipe,
+        "data_pagto":       data_upload,
+        "cpf_cnpj":         raw["cpf_cnpj"],
+        "cliente":          raw["cliente"],
+        "valor_veiculo":    veiculo,
+        "entrada":          entrada,
+        "valor_financiado": valor_financiado,
+        "spf":              raw.get("spf") or "",
+        "ap":               raw.get("ap") or "",
+        "gap":              raw.get("gap") or "",
+        "franquia":         raw.get("franquia") or "",
+        "ge":               raw.get("ge") or "",
+        "protege":          raw.get("protege") or "",
+        "prazo":            raw["prazo"],
+        "taxa":             taxa_str,
+        "n_s":              tipo,
+        "sempre_novo":      raw.get("sempre_novo") or "",
+        "peso_tabela":      peso,
+        "vendedor":         vendedor,
+        "retorno":          retorno,
+        "pontos":           pontos,
     }
 
 
 def para_linha_sheets(d: dict) -> list:
     return [
-        d["proposta"],              # A  - PROPOSTA
-        d["equipe"],                # B  - EQUIPE
-        d["data_pagto"],            # C  - D. PAGTO
-        d["cpf_cnpj"],              # D  - CPF/CNPJ
-        d["cliente"],               # E  - CLIENTE
-        d["valor_veiculo"],         # F  - VALOR DO VEICULO
-        d["entrada"],               # G  - ENTRADA
-        d["valor_financiado"],      # H  - VALOR FINANCIADO
-        d["spf"],                   # I  - SPF
-        d["app"],                   # J  - APP
-        d["gap"],                   # K  - GAP
-        d["franquia"],              # L  - FRANQ
-        "",                         # M  - REV PLAN (desconsiderada)
-        d["ge"],                    # N  - GE
-        d["protege"],               # O  - PROTEGE
-        d["prazo"],                 # P  - PRAZO
-        d["taxa"],                  # Q  - TAXA
-        d["tipo_veiculo"],          # R  - N/S
-        d["sempre_novo"],           # S  - SEMPRE NV
-        d["peso_tabela"],           # T  - Peso Tabela
-        d["vendedor"],              # U  - VENDEDOR
-        d["retorno"],               # V  - RETORNO3
-        d["pontos"],                # W  - PONTOS POR CONTRATOS
-        "",                         # X  - CONTRATOS SEM PONTOS (desconsiderada)
-        d["correspondencias_ge"],   # Y  - CORRESPONDÊNCIAS (tipo GE)
-        d["correspondencias_pts"],  # Z  - CORRESPONDÊNCIAS (pontos GE)
-        "",                         # AA - vazio
-        d["loja"],                  # AB - LOJA
+        d["proposta"],          # A  - PROPOSTA
+        d["equipe"],            # B  - EQUIPE
+        d["data_pagto"],        # C  - DATA PAGAMENTO
+        d["cpf_cnpj"],          # D  - CPF/CNPJ
+        d["cliente"],           # E  - CLIENTE
+        d["valor_veiculo"],     # F  - VALOR VEICULO
+        d["entrada"],           # G  - ENTRADA
+        d["valor_financiado"],  # H  - VALOR FINANCIADO
+        d["spf"],               # I  - SPF
+        d["ap"],                # J  - AP
+        d["gap"],               # K  - GAP
+        d["franquia"],          # L  - FRANQUIA
+        "",                     # M  - REV PLAN (vazio)
+        d["ge"],                # N  - GE
+        d["protege"],           # O  - PROTEGE
+        d["prazo"],             # P  - PRAZO
+        d["taxa"],              # Q  - TAXA
+        d["n_s"],               # R  - N/S
+        d["sempre_novo"],       # S  - SEMPRE NOVO
+        d["peso_tabela"],       # T  - PESO TABELA
+        d["vendedor"],          # U  - VENDEDOR
+        d["retorno"],           # V  - RETORNO
+        d["pontos"],            # W  - PONTOS
     ]
 
 
@@ -340,22 +298,19 @@ def produto_para_linha_avulso(item: dict) -> list:
         "Prot Plus 24": "PROTEGE PLUS 24",
         "Prot Plus 36": "PROTEGE PLUS 36",
     }
-    row = [""] * 28             # colunas A–AB (28 colunas)
+    row = [""] * 23             # colunas A–W (23 colunas)
     row[1]  = item["equipe"]    # B  - EQUIPE
-    row[2]  = item["data"]      # C  - D. PAGTO
+    row[2]  = item["data"]      # C  - DATA PAGAMENTO
     row[3]  = item["cpf"]       # D  - CPF/CNPJ
     row[4]  = item["nome"]      # E  - CLIENTE
     row[20] = item["vendedor"]  # U  - VENDEDOR
     row[22] = item["pontos"]    # W  - PONTOS
-    row[27] = item["equipe"]    # AB - LOJA
 
     cat  = item["categoria"]
     prod = item["produto"]
 
     if cat == "Garantia":
         row[13] = prod                          # N  - GE
-        row[24] = prod                          # Y  - CORRESPONDÊNCIAS (tipo)
-        row[25] = PONTOS_AVULSO.get(prod, "")   # Z  - CORRESPONDÊNCIAS (pts)
     elif cat == "Seguro":
         row[8] = prod                           # I  - coluna de Seguro/SPF
     elif cat == "VW Protege":
