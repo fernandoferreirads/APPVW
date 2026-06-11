@@ -1014,7 +1014,6 @@ if st.session_state.get("_msal_auth_status", "not_auth") == "not_auth":
 _gemini_default    = os.getenv("GEMINI_API_KEY")       or st.secrets.get("GEMINI_API_KEY",       "")
 _client_id_default = os.getenv("AZURE_CLIENT_ID")     or st.secrets.get("AZURE_CLIENT_ID",      "4c19cc34-0c80-4dcd-9d8c-f0e35c0f48b5")
 _excel_url_default = os.getenv("EXCEL_SHARING_URL")   or st.secrets.get("EXCEL_SHARING_URL",    "https://1drv.ms/x/c/34eb48bbe5babf33/IQBkkgUSG37eT7AUIIT0EnFIAawdB8KZ6Yx5ypjyblkZbdU?e=DuWAzF")
-_dash_url_default  = os.getenv("DASH_SHARING_URL")    or st.secrets.get("DASH_SHARING_URL",     "https://1drv.ms/x/c/34eb48bbe5babf33/IQAkPFay4CHMQK5jX-wzXc86AQa8yU6Irz1PUlG_jqgEh5c?e=ioOQEQ")
 
 with st.popover("⚙️  Configurações"):
     col1, col2 = st.columns(2)
@@ -1039,12 +1038,6 @@ with st.popover("⚙️  Configurações"):
         value=_excel_url_default,
         help="OneDrive → abrir arquivo → Compartilhar → Copiar link",
         key="cfg_excel_url",
-    )
-    dash_url = st.text_input(
-        "Link do Excel — BIGBASE (OneDrive)",
-        value=_dash_url_default,
-        help="OneDrive → abrir o arquivo BIGBASE → Compartilhar → Copiar link",
-        key="cfg_dash_url",
     )
     st.divider()
 
@@ -1529,8 +1522,8 @@ with _tab_c:
 
 with _tab_com:
     from comissao import render_comissao as _render_comm
-    _render_comm(az_client_id, dash_url)
+    _render_comm(az_client_id, excel_url)
 
 with _tab_graf:
     from graficos import render_graficos as _render_graf
-    _render_graf(az_client_id, dash_url)
+    _render_graf(az_client_id, excel_url)
