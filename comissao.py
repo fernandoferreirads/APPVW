@@ -484,8 +484,13 @@ def calc_commission_outros_bancos(
         ]
 
     if vendedor and "vendedor" in df.columns:
+        # Bidirecional: "GRAZIELLE" casa com "GRAZIELLE SANTOS LIMA" e vice-versa.
+        # OUTROS_BANCOS grava o nome curto (chave VENDEDOR_EQUIPE); BASE_PAGAMENTOS
+        # usa o nome completo extraído do PDF. O contains simples não funcionaria.
         vup = vendedor.upper().strip()
-        df = df[df["vendedor"].fillna("").str.upper().str.contains(vup, regex=False)]
+        df = df[df["vendedor"].fillna("").str.upper().str.strip().apply(
+            lambda s: bool(s) and (s in vup or vup in s)
+        )]
 
     if df.empty:
         return _zero
