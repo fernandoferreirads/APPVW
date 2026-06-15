@@ -37,7 +37,6 @@ VENDEDOR_EQUIPE = {
     "CLINSMAN WILKE DE VASCONCELOS":          "VW SIA",
     "FRANCISCO RICLEY DE SOUSA CARVALHO":     "VW SIA",
     "GABRIEL DA SILVA ALMEIDA BARBOSA":       "VW SIA",
-    "HARLEN GOMES BORGES":                    "VW SIA",
     "HARLEN BORGES GOMES":                    "VW SIA",
     "JOSE PEREIRA NEVES":                     "VW SIA",
     "LARISSA OLIVEIRA LIMA":                  "VW SIA",
