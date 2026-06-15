@@ -574,56 +574,33 @@ def _excel_hdrs(token: str, session_id: str = "") -> dict:
 # ── Row detection ─────────────────────────────────────────────────────────────
 
 def _proxima_linha_excel(base_url: str, hdrs: dict) -> int:
-    """Retorna a 1ª linha VAZIA após o último dado real (coluna D = CPF/CNPJ)."""
-    # Passo 1: só metadados do usedRange (sem baixar valores)
-    r1 = requests.get(
-        f"{base_url}/usedRange?$select=rowIndex,rowCount,columnIndex",
+    """Retorna a 1ª linha VAZIA verificando TODAS as colunas da aba.
+    Nunca sobrescreve linhas que contenham qualquer dado preenchido."""
+    r = requests.get(
+        f"{base_url}/usedRange",
         headers=hdrs,
-        timeout=15,
+        timeout=20,
     )
-    if r1.status_code != 200:
+    if r.status_code != 200:
         return 2
     try:
-        meta = r1.json()
+        data = r.json()
     except Exception:
         return 2
 
-    row_index = meta.get("rowIndex", 0)
-    row_count = meta.get("rowCount", 0)
+    row_index = data.get("rowIndex", 0)
+    row_count = data.get("rowCount", 0)
+    values    = data.get("values", [])
 
-    # Fallback: API ignorou $select e devolveu values → usa direto
-    if meta.get("values"):
-        values = meta["values"]
-        d_col  = max(3 - meta.get("columnIndex", 0), 0)
-        for i in range(len(values) - 1, -1, -1):
-            cell = values[i][d_col] if d_col < len(values[i]) else ""
-            if cell not in ("", None, 0):
-                return row_index + i + 2
+    if not values or row_count == 0:
         return max(row_index + 1, 2)
 
-    if row_count == 0:
-        return max(row_index + 1, 2)
+    # Varre de baixo para cima — primeira linha com qualquer célula preenchida
+    for i in range(len(values) - 1, -1, -1):
+        if any(cell not in ("", None, 0) for cell in values[i]):
+            return row_index + i + 2  # próxima linha, base-1
 
-    last_row = row_index + row_count
-
-    # Passo 2: apenas coluna D (CPF/CNPJ) — muito menor que usedRange completo
-    r2 = requests.get(
-        f"{base_url}/range(address='D1:D{last_row}')",
-        headers=hdrs,
-        timeout=15,
-    )
-    if r2.status_code != 200:
-        return last_row + 1
-    try:
-        col_vals = r2.json().get("values", [])
-    except Exception:
-        return last_row + 1
-
-    for i in range(len(col_vals) - 1, -1, -1):
-        cell = col_vals[i][0] if col_vals[i] else ""
-        if cell not in ("", None, 0):
-            return i + 2
-    return 2
+    return max(row_index + 1, 2)
 
 
 # ── Helpers comuns de inserção ────────────────────────────────────────────────
