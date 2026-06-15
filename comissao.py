@@ -515,6 +515,7 @@ def calc_commission_outros_bancos(
         "spf_commission":    spf_commission,
         "retorno_commission": retorno_commission,
         "total_contratos":   len(df),
+        "df_filtrado":       df.reset_index(drop=True),
     }
 
 
@@ -799,6 +800,30 @@ def _render_charts(summary: dict) -> None:
                 )
 
 
+def _render_contratos_ob(df_ob: pd.DataFrame) -> None:
+    """Tabela dos contratos de Outros Bancos do período filtrado."""
+    if df_ob is None or df_ob.empty:
+        st.info("ℹ️ Nenhum contrato de Outros Bancos no período selecionado.")
+        return
+
+    cols_show = [c for c in [
+        "data_pagamento", "financeira", "cliente", "cpf_cnpj",
+        "valor_financiado", "spf", "n_s", "tipo_retorno", "vendedor", "retorno",
+    ] if c in df_ob.columns]
+
+    display = df_ob[cols_show].copy()
+    if "data_pagamento" in display.columns:
+        display["data_pagamento"] = display["data_pagamento"].dt.strftime("%d/%m/%Y")
+    for col in ("valor_financiado", "retorno"):
+        if col in display.columns:
+            display[col] = display[col].apply(
+                lambda x: f"R$ {x:,.2f}" if pd.notna(x) and x != "" else ""
+            )
+
+    display.columns = [c.replace("_", " ").upper() for c in display.columns]
+    st.dataframe(display, use_container_width=True, hide_index=True)
+
+
 def _render_contratos(df_filtrado: pd.DataFrame) -> None:
     """Tabela dos contratos individuais do período filtrado."""
     cols_show = [c for c in ["proposta", "data_pagto", "cliente", "cpf_cnpj",
@@ -943,6 +968,7 @@ def render_comissao(client_id: str = "", sharing_url: str = "") -> None:
         summary["ob_spf_commission"]     = ob_result["spf_commission"]
         summary["ob_retorno_commission"] = ob_result["retorno_commission"]
         summary["ob_total_contratos"]    = ob_result["total_contratos"]
+        summary["df_ob_filtrado"]        = ob_result.get("df_filtrado", pd.DataFrame())
         st.session_state["comm_resultado"] = summary
 
     # ── Exibe resultado ────────────────────────────────────────────────────────
@@ -963,8 +989,12 @@ def render_comissao(client_id: str = "", sharing_url: str = "") -> None:
     # KPIs
     _render_kpis(resultado)
 
-    # Abas internas: Detalhamento | Contratos
-    sub_det, sub_con = st.tabs(["📋 Detalhamento por Produto", "📄 Contratos do Período"])
+    # Abas internas: Detalhamento | Contratos | Outros Bancos
+    sub_det, sub_con, sub_ob = st.tabs([
+        "📋 Detalhamento por Produto",
+        "📄 Contratos do Período",
+        "🏦 Outros Bancos",
+    ])
 
     with sub_det:
         st.markdown("#### Comissão por produto")
@@ -978,6 +1008,11 @@ def render_comissao(client_id: str = "", sharing_url: str = "") -> None:
             f"**{resultado['total_contratos']} contrato(s)** no período filtrado"
         )
         _render_contratos(resultado["df_filtrado"])
+
+    with sub_ob:
+        n_ob = resultado.get("ob_total_contratos", 0)
+        st.markdown(f"**{n_ob} contrato(s) de Outros Bancos** no período filtrado")
+        _render_contratos_ob(resultado.get("df_ob_filtrado", pd.DataFrame()))
 
     # Botões de ação
     col_lim, col_att, _ = st.columns([1, 1, 4])
