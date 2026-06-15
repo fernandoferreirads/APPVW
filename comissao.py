@@ -170,6 +170,39 @@ _ABA_OUTROS_BANCOS  = "OUTROS_BANCOS"
 _SPF_FINANCEIRAS_OB = {"BRADESCO", "ITAU", "ITAÚ", "SAFRA", "SANTANDER"}
 _CACHE_TTL          = 300   # segundos (5 min)
 
+_VENDEDOR_MATRICULA: dict[str, int | None] = {
+    "ALBERT ALVES TORRES":                  41273,
+    "CATARINA GUEDES FERNANDES":            40469,
+    "CLAUDIO HENRIQUE RODRIGUES CABRAL":    40777,
+    "CLINSMAN WILKE DE VASCONCELOS":        39165,
+    "FRANCISCO RICLEY DE SOUSA CARVALHO":   None,
+    "GABRIEL DA SILVA ALMEIDA BARBOSA":     35372,
+    "HARLEN BORGES GOMES":                  None,
+    "JOSE PEREIRA NEVES":                   25375,
+    "LARISSA OLIVEIRA LIMA":                35887,
+    "LEANDRO MATOS CABRAL":                 24969,
+    "LUCAS LEONARDO DOS SANTOS ARAUJO":     None,
+    "MARCUS VINICIUS RODRIGUES LOPES":      25515,
+    "NEY SANTOS CERQUEIRA":                 15149,
+    "RENATO MENDES ARAUJO SANTOS":          33071,
+    "RODRIGO HERCULANO TORRES SANTANA":     32452,
+    "SABRINA ALMEIDA VIANA":                19865,
+    "YNGRID KAREN BATISTA DE FREITAS":      41681,
+    "AMAURI RODRIGUES DOS SANTOS":          9250,
+    "DANILO DA ROCHA NEVES":                34836,
+    "FLAVIO PEREIRA DE SOUZA":              31667,
+    "JAME WILLIAMS DA SILVA COSTA":         40782,
+    "RODRIGO DA SILVA PAZ":                 26506,
+    "THIAGO TORRES DA SILVA GOUVES":        None,
+    "ANTONINO VITORINO DE SOUSA":           24061,
+    "DOUGLAS OLIVEIRA DE MORAIS":           31755,
+    "EDUARDO ALVES ROQUE":                  31754,
+    "EVERTON ANICESIO VELOSO":              21412,
+    "GRAZIELLE SANTOS LIMA":                40833,
+    "PEDRO HENRIQUE SOARES DUTRA":          28945,
+    "THOMAS RAVELLI RODRIGUES DE GODOI":    41350,
+}
+
 
 # ─── Camada de Leitura — Graph API ────────────────────────────────────────────
 
@@ -820,7 +853,7 @@ def _gerar_xlsx_equipe(equipe: str, resultados: list, data_ini, data_fim) -> byt
     ws1   = wb.active
     ws1.title = "Resumo Equipe"
     _RES_HDR = [
-        "Vendedor", "Contratos VW", "Produtos",
+        "Vendedor", "Matrícula", "Contratos VW", "Produtos",
         "Comissão Produtos (R$)", "Retorno VW (R$)", "Subtotal VW (R$)",
         "SPF Outros Bancos (R$)", "Retorno Outros Bancos (R$)", "Total Geral (R$)",
     ]
@@ -835,11 +868,13 @@ def _gerar_xlsx_equipe(equipe: str, resultados: list, data_ini, data_fim) -> byt
             "spf_ob": 0.0, "ret_ob": 0.0, "tg": 0.0}
 
     for res in resultados:
-        ob_spf = res.get("ob_spf_commission",     0.0)
-        ob_ret = res.get("ob_retorno_commission",  0.0)
-        tg     = res["total_bruto"] + ob_spf + ob_ret
+        ob_spf    = res.get("ob_spf_commission",     0.0)
+        ob_ret    = res.get("ob_retorno_commission",  0.0)
+        tg        = res["total_bruto"] + ob_spf + ob_ret
+        matricula = _VENDEDOR_MATRICULA.get(res["vendedor"].upper().strip())
         ws1.append([
             res["vendedor"],
+            matricula,
             res["total_contratos"],
             res["total_produtos"],
             res["total_comissao"],
@@ -848,7 +883,8 @@ def _gerar_xlsx_equipe(equipe: str, resultados: list, data_ini, data_fim) -> byt
             ob_spf, ob_ret, tg,
         ])
         rn = ws1.max_row
-        for c in range(4, n_cols_res + 1):
+        ws1.cell(rn, 2).alignment = Alignment(horizontal="center")
+        for c in range(5, n_cols_res + 1):
             ws1.cell(rn, c).number_format = _fmt_moeda
         tots["contr"]  += res["total_contratos"]
         tots["prod"]   += res["total_produtos"]
@@ -860,7 +896,7 @@ def _gerar_xlsx_equipe(equipe: str, resultados: list, data_ini, data_fim) -> byt
         tots["tg"]     += tg
 
     ws1.append([
-        "TOTAL", tots["contr"], tots["prod"],
+        "TOTAL", "", tots["contr"], tots["prod"],
         tots["com"], tots["ret_vw"], tots["sub_vw"],
         tots["spf_ob"], tots["ret_ob"], tots["tg"],
     ])
@@ -868,7 +904,7 @@ def _gerar_xlsx_equipe(equipe: str, resultados: list, data_ini, data_fim) -> byt
     for c in range(1, n_cols_res + 1):
         ws1.cell(rn, c).font = Font(bold=True, color="FFFFFF")
         ws1.cell(rn, c).fill = PatternFill("solid", fgColor=_AZUL)
-    for c in range(4, n_cols_res + 1):
+    for c in range(5, n_cols_res + 1):
         ws1.cell(rn, c).number_format = _fmt_moeda
     _auto_width(ws1)
 
@@ -886,13 +922,15 @@ def _gerar_xlsx_equipe(equipe: str, resultados: list, data_ini, data_fim) -> byt
 
         _titulo(ws, vend_name, 2, height=26)
 
-        ob_spf   = res.get("ob_spf_commission",     0.0)
-        ob_ret   = res.get("ob_retorno_commission",  0.0)
-        ob_tot   = ob_spf + ob_ret
-        has_ob   = ob_tot > 0 or res.get("ob_total_contratos", 0) > 0
-        tg       = res["total_bruto"] + ob_tot
+        ob_spf    = res.get("ob_spf_commission",     0.0)
+        ob_ret    = res.get("ob_retorno_commission",  0.0)
+        ob_tot    = ob_spf + ob_ret
+        has_ob    = ob_tot > 0 or res.get("ob_total_contratos", 0) > 0
+        tg        = res["total_bruto"] + ob_tot
+        matricula = _VENDEDOR_MATRICULA.get(vend_name.upper().strip())
 
         kpis = [
+            ("Matrícula",               matricula if matricula else "—", False),
             ("Período",                  periodo_str,             False),
             (None, None, False),
             ("Contratos no período (VW)", res["total_contratos"], False),
