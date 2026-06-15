@@ -1010,9 +1010,23 @@ def render_comissao(client_id: str = "", sharing_url: str = "") -> None:
         _render_contratos(resultado["df_filtrado"])
 
     with sub_ob:
-        n_ob = resultado.get("ob_total_contratos", 0)
-        st.markdown(f"**{n_ob} contrato(s) de Outros Bancos** no período filtrado")
-        _render_contratos_ob(resultado.get("df_ob_filtrado", pd.DataFrame()))
+        df_ob_disp = resultado.get("df_ob_filtrado")
+        n_ob       = resultado.get("ob_total_contratos", 0)
+
+        # Detecta resultado desatualizado: contagem > 0 mas DataFrame ausente/vazio
+        dados_incompletos = (
+            df_ob_disp is None
+            or (isinstance(df_ob_disp, pd.DataFrame) and df_ob_disp.empty and n_ob > 0)
+        )
+        if dados_incompletos:
+            st.warning(
+                "⚠️ Dados desatualizados. Clique em **🔍 Consultar** novamente "
+                "para exibir os contratos de Outros Bancos."
+            )
+        else:
+            n_real = len(df_ob_disp) if df_ob_disp is not None else 0
+            st.markdown(f"**{n_real} contrato(s) de Outros Bancos** no período filtrado")
+            _render_contratos_ob(df_ob_disp if df_ob_disp is not None else pd.DataFrame())
 
     # Botões de ação
     col_lim, col_att, _ = st.columns([1, 1, 4])
