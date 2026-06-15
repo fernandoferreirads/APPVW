@@ -595,6 +595,181 @@ _PALETTE = ["#001E50","#0040B0","#00B0F0","#1EBE5D",
             "#FF6B35","#9B59B6","#F39C12","#E74C3C"]
 
 
+def _gerar_xlsx(resultado: dict) -> bytes:
+    """Gera XLSX de comissão com 4 abas: Resumo, Por Produto, Contratos VW, Outros Bancos."""
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    _AZUL  = "001E50"
+    _CINZA = "F2F4F8"
+
+    _hdr_font  = Font(bold=True, color="FFFFFF", size=11)
+    _hdr_fill  = PatternFill("solid", fgColor=_AZUL)
+    _hdr_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    _tot_font  = Font(bold=True)
+
+    def _auto_width(ws):
+        for col in ws.columns:
+            ltr = col[0].column_letter
+            mx  = max((len(str(c.value or "")) for c in col), default=8)
+            ws.column_dimensions[ltr].width = min(mx + 4, 52)
+
+    def _style_header(ws, n_cols):
+        for c in range(1, n_cols + 1):
+            cell = ws.cell(1, c)
+            cell.font      = _hdr_font
+            cell.fill      = _hdr_fill
+            cell.alignment = _hdr_align
+        ws.row_dimensions[1].height = 22
+        ws.freeze_panes = "A2"
+
+    wb  = Workbook()
+    ob_spf     = resultado.get("ob_spf_commission",     0.0)
+    ob_ret_val = resultado.get("ob_retorno_commission", 0.0)
+    ob_tot     = ob_spf + ob_ret_val
+    has_ob     = ob_tot > 0 or resultado.get("ob_total_contratos", 0) > 0
+    total_geral = resultado["total_bruto"] + ob_tot
+
+    # ── Aba 1: Resumo ─────────────────────────────────────────────────────────
+    ws1 = wb.active
+    ws1.title = "Resumo"
+    ws1.column_dimensions["A"].width = 38
+    ws1.column_dimensions["B"].width = 22
+
+    # Título
+    ws1.merge_cells("A1:B1")
+    t = ws1["A1"]
+    t.value     = "COMISSÃO DE VENDEDORES — FLOW F&I"
+    t.font      = Font(bold=True, color="FFFFFF", size=13)
+    t.fill      = PatternFill("solid", fgColor=_AZUL)
+    t.alignment = Alignment(horizontal="center", vertical="center")
+    ws1.row_dimensions[1].height = 30
+
+    _fmt_moeda = 'R$ #,##0.00'
+    _linhas_res = [
+        ("Vendedor",                   resultado["vendedor"],       False),
+        ("Período",
+         f"{resultado['data_ini'].strftime('%d/%m/%Y')} → "
+         f"{resultado['data_fim'].strftime('%d/%m/%Y')}",           False),
+        (None, None, False),
+        ("Contratos no período (VW)",  resultado["total_contratos"],False),
+        ("Produtos produzidos",        resultado["total_produtos"],  False),
+        (None, None, False),
+        ("Comissão de Produtos",       resultado["total_comissao"],  False),
+        ("Retorno de Financiamento",   resultado["total_retorno"],   False),
+        ("Subtotal Banco VW",          resultado["total_bruto"],     True),
+    ]
+    if has_ob:
+        _linhas_res += [
+            (None, None, False),
+            ("Comissão SPF — Outros Bancos",     ob_spf,     False),
+            ("Comissão Retorno — Outros Bancos", ob_ret_val, False),
+        ]
+    _linhas_res += [
+        (None, None, False),
+        ("TOTAL GERAL",  total_geral, True),
+    ]
+
+    for i, (label, value, bold) in enumerate(_linhas_res, start=2):
+        if label is None:
+            continue
+        ca = ws1.cell(i, 1, value=label)
+        cb = ws1.cell(i, 2, value=value)
+        ca.font = Font(bold=bold)
+        cb.font = Font(bold=bold)
+        if label == "TOTAL GERAL":
+            for cell in (ca, cb):
+                cell.fill = PatternFill("solid", fgColor=_AZUL)
+                cell.font = Font(bold=True, color="FFFFFF")
+        if isinstance(value, float):
+            cb.number_format = _fmt_moeda
+
+    # ── Aba 2: Por Produto ────────────────────────────────────────────────────
+    ws2 = wb.create_sheet("Por Produto")
+    _PP_HDR = ["Categoria", "Produto", "Qtd", "Comissão Unit. (R$)", "Total (R$)"]
+    ws2.append(_PP_HDR)
+    _style_header(ws2, len(_PP_HDR))
+
+    total_qtd  = 0
+    total_com  = 0.0
+    for row in resultado.get("por_produto", []):
+        ws2.append([row["categoria"], row["produto"], row["qtd"], row["unit"], row["total"]])
+        r = ws2.max_row
+        ws2.cell(r, 4).number_format = _fmt_moeda
+        ws2.cell(r, 5).number_format = _fmt_moeda
+        total_qtd += row["qtd"]
+        total_com += row["total"]
+
+    if resultado.get("por_produto"):
+        ws2.append(["", "TOTAL", total_qtd, "", total_com])
+        r = ws2.max_row
+        for c in range(1, 6):
+            ws2.cell(r, c).font = _tot_font
+            ws2.cell(r, c).fill = PatternFill("solid", fgColor=_CINZA)
+        ws2.cell(r, 5).number_format = _fmt_moeda
+
+    _auto_width(ws2)
+
+    # ── Aba 3: Contratos VW ───────────────────────────────────────────────────
+    ws3 = wb.create_sheet("Contratos VW")
+    _VW_COLS   = ["proposta", "data_pagto", "cliente", "cpf_cnpj",
+                  "spf", "app", "gap", "franquia", "ge", "protege", "retorno", "pontos"]
+    _VW_LABELS = ["Proposta", "Data Pagto", "Cliente", "CPF/CNPJ",
+                  "SPF", "APP", "GAP", "Franquia", "GE", "Protege", "Retorno (R$)", "Pontos"]
+    ws3.append(_VW_LABELS)
+    _style_header(ws3, len(_VW_LABELS))
+
+    df_vw = resultado.get("df_filtrado", pd.DataFrame())
+    _idx_ret = _VW_COLS.index("retorno") + 1
+    for _, row in df_vw.iterrows():
+        linha = []
+        for col in _VW_COLS:
+            val = row.get(col)
+            if col == "data_pagto" and pd.notna(val):
+                val = pd.Timestamp(val).strftime("%d/%m/%Y")
+            elif isinstance(val, float) and pd.isna(val):
+                val = ""
+            linha.append(val)
+        ws3.append(linha)
+        ws3.cell(ws3.max_row, _idx_ret).number_format = _fmt_moeda
+
+    _auto_width(ws3)
+
+    # ── Aba 4: Outros Bancos (condicional) ────────────────────────────────────
+    df_ob = resultado.get("df_ob_filtrado")
+    if has_ob and df_ob is not None and not (isinstance(df_ob, pd.DataFrame) and df_ob.empty):
+        ws4 = wb.create_sheet("Outros Bancos")
+        _OB_COLS   = ["data_pagamento", "financeira", "cliente", "cpf_cnpj",
+                      "valor_financiado", "spf", "n_s", "tipo_retorno", "vendedor", "retorno"]
+        _OB_LABELS = ["Data Pagamento", "Financeira", "Cliente", "CPF/CNPJ",
+                      "Vr. Financiado (R$)", "SPF", "N/S", "Tipo Retorno", "Vendedor", "Retorno (R$)"]
+        ws4.append(_OB_LABELS)
+        _style_header(ws4, len(_OB_LABELS))
+
+        _idx_vf  = _OB_COLS.index("valor_financiado") + 1
+        _idx_ret = _OB_COLS.index("retorno") + 1
+        for _, row in df_ob.iterrows():
+            linha = []
+            for col in _OB_COLS:
+                val = row.get(col)
+                if col == "data_pagamento" and pd.notna(val):
+                    val = pd.Timestamp(val).strftime("%d/%m/%Y")
+                elif isinstance(val, float) and pd.isna(val):
+                    val = ""
+                linha.append(val)
+            ws4.append(linha)
+            r = ws4.max_row
+            ws4.cell(r, _idx_vf).number_format  = _fmt_moeda
+            ws4.cell(r, _idx_ret).number_format = _fmt_moeda
+
+        _auto_width(ws4)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 def _render_kpis(summary: dict) -> None:
     # ── Linha 1: quadro financeiro principal ──────────────────────────────────
     st.markdown("""
@@ -1029,7 +1204,7 @@ def render_comissao(client_id: str = "", sharing_url: str = "") -> None:
             _render_contratos_ob(df_ob_disp if df_ob_disp is not None else pd.DataFrame())
 
     # Botões de ação
-    col_lim, col_att, _ = st.columns([1, 1, 4])
+    col_lim, col_att, col_exp, _ = st.columns([1, 1, 1, 3])
     with col_lim:
         if st.button("🗑️ Limpar", key="comm_clear", use_container_width=True):
             st.session_state.pop("comm_resultado", None)
@@ -1042,3 +1217,18 @@ def render_comissao(client_id: str = "", sharing_url: str = "") -> None:
             st.session_state.pop("_comm_ts_ob", None)
             st.session_state.pop("comm_resultado", None)
             st.rerun()
+    with col_exp:
+        xlsx_bytes = _gerar_xlsx(resultado)
+        nome_arq = (
+            f"Comissao_{resultado['vendedor'].replace(' ', '_')}_"
+            f"{resultado['data_ini'].strftime('%d%m%Y')}-"
+            f"{resultado['data_fim'].strftime('%d%m%Y')}.xlsx"
+        )
+        st.download_button(
+            "📥 Exportar XLSX",
+            data=xlsx_bytes,
+            file_name=nome_arq,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+            key="comm_export",
+        )
