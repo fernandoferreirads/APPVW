@@ -1357,147 +1357,6 @@ with _tab_c:
                     except Exception as e:
                         st.error(f"❌ Erro ao inserir no Excel: {e}")
 
-    # ── Cadastro Avulso ───────────────────────────────────────────────────────────
-    st.markdown(
-        '<hr style="border:none;border-top:2px solid #eaecf4;margin:2.5rem 0 1.5rem 0;">',
-        unsafe_allow_html=True,
-    )
-
-    st.markdown("""
-    <div class="section-title">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-             stroke="#001e50" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 20h9"/>
-            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-        </svg>
-        <span>Cadastro Avulso</span>
-    </div>
-    <p style="color:#6b7280;font-size:0.875rem;margin:-0.5rem 0 1.25rem 32px;">
-        Garantias &nbsp;·&nbsp; Seguros &nbsp;·&nbsp; VW Protege &mdash; produtos inseridos fora do financiamento
-    </p>
-    """, unsafe_allow_html=True)
-
-    if "avulso_items" not in st.session_state:
-        st.session_state["avulso_items"] = []
-
-    aba_selecionada_av = "BASE_PAGAMENTOS"
-
-    # Formulário de entrada
-    with st.container(border=True):
-        # Linha 1 — Nome e CPF
-        col_av_nome, col_av_cpf = st.columns(2)
-        with col_av_nome:
-            av_nome = st.text_input(
-                "Nome do Cliente",
-                key="av_nome",
-                placeholder="Ex: JOÃO SILVA SANTOS",
-            )
-        with col_av_cpf:
-            av_cpf = st.text_input(
-                "CPF",
-                key="av_cpf",
-                placeholder="000.000.000-00",
-            )
-
-        # Linha 2 — Vendedor | Categoria | Produto (cascata)
-        col_av_vend, col_av_cat, col_av_prod = st.columns(3)
-        with col_av_vend:
-            av_vendedor = st.selectbox(
-                "Vendedor",
-                options=sorted(VENDEDOR_EQUIPE.keys()),
-                key="av_vendedor",
-            )
-            _av_equipe = lookup_vendedor(av_vendedor)
-            st.caption(f"🏢 Equipe: **{_av_equipe}**")
-
-        with col_av_cat:
-            av_cat = st.selectbox(
-                "Categoria",
-                options=list(PRODUTOS_AVULSO.keys()),
-                key="av_categoria",
-            )
-
-        with col_av_prod:
-            # Chave dinâmica garante reset ao trocar de categoria
-            av_prod = st.selectbox(
-                "Produto",
-                options=PRODUTOS_AVULSO[av_cat],
-                key=f"av_produto_{av_cat}",
-            )
-            _av_pts = PONTOS_AVULSO.get(av_prod, 0)
-            st.caption(f"⭐ Pontos: **{_av_pts}**")
-
-        # Botão Adicionar
-        col_av_add, _col_sp = st.columns([1, 4])
-        with col_av_add:
-            av_add = st.button("➕ Adicionar à lista", key="av_add", use_container_width=True)
-
-    if av_add:
-        if not av_nome.strip():
-            st.warning("⚠️ Informe o nome do cliente.")
-        elif not av_cpf.strip():
-            st.warning("⚠️ Informe o CPF.")
-        else:
-            st.session_state["avulso_items"].append({
-                "nome":      av_nome.strip().upper(),
-                "cpf":       av_cpf.strip(),
-                "vendedor":  av_vendedor,
-                "equipe":    _av_equipe,
-                "categoria": av_cat,
-                "produto":   av_prod,
-                "pontos":    _av_pts,
-                "data":      datetime.now().strftime("%d/%m/%Y"),
-            })
-            st.rerun()
-
-    # Prévia da fila e botão de inserção
-    if st.session_state["avulso_items"]:
-        _av_items = st.session_state["avulso_items"]
-        st.success(f"**{len(_av_items)} item(ns)** na fila — confira abaixo antes de inserir na planilha.")
-
-        _av_df = pd.DataFrame([
-            {
-                "Nome":      it["nome"],
-                "CPF":       it["cpf"],
-                "Vendedor":  it["vendedor"],
-                "Equipe":    it["equipe"],
-                "Categoria": it["categoria"],
-                "Produto":   it["produto"],
-                "Pontos":    it["pontos"],
-            }
-            for it in _av_items
-        ])
-        st.dataframe(_av_df, use_container_width=True, hide_index=True)
-
-        col_av_ins, col_av_lim = st.columns([4, 1])
-
-        with col_av_lim:
-            if st.button("🗑️ Limpar", key="av_clear", use_container_width=True):
-                st.session_state["avulso_items"] = []
-                st.rerun()
-
-        with col_av_ins:
-            if not excel_ok:
-                st.warning("Faça login com sua conta Microsoft nas Configurações para habilitar a inserção.")
-            else:
-                if st.button(
-                    f"✅ Inserir {len(_av_items)} item(ns) na planilha → aba {aba_selecionada_av}",
-                    type="primary",
-                    key="av_inserir",
-                    use_container_width=True,
-                ):
-                    try:
-                        with st.spinner(f"⏳ Inserindo {len(_av_items)} item(ns) na planilha…"):
-                            _av_ini = inserir_e_colorir_excel(_av_items, az_client_id, excel_url, aba_selecionada_av)
-                        st.success(
-                            f"✅ **{len(_av_items)} item(ns)** inserido(s) com sucesso na aba "
-                            f"**{aba_selecionada_av}** a partir da linha **{_av_ini}**!"
-                        )
-                        st.session_state["avulso_items"] = []
-                        st.balloons()
-                    except Exception as e:
-                        st.error(f"❌ Erro ao inserir: {e}")
-
     # ── Outros Bancos ─────────────────────────────────────────────────────────
     st.markdown(
         '<hr style="border:none;border-top:2px solid #eaecf4;margin:2.5rem 0 1.5rem 0;">',
@@ -1692,6 +1551,147 @@ with _tab_c:
                             f"**{_aba_ob}** a partir da linha **{_ob_ini}**!"
                         )
                         st.session_state["ob_items"] = []
+                        st.balloons()
+                    except Exception as e:
+                        st.error(f"❌ Erro ao inserir: {e}")
+
+    # ── Cadastro Avulso ───────────────────────────────────────────────────────────
+    st.markdown(
+        '<hr style="border:none;border-top:2px solid #eaecf4;margin:2.5rem 0 1.5rem 0;">',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("""
+    <div class="section-title">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+             stroke="#001e50" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20h9"/>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+        </svg>
+        <span>Cadastro Avulso</span>
+    </div>
+    <p style="color:#6b7280;font-size:0.875rem;margin:-0.5rem 0 1.25rem 32px;">
+        Garantias &nbsp;·&nbsp; Seguros &nbsp;·&nbsp; VW Protege &mdash; produtos inseridos fora do financiamento
+    </p>
+    """, unsafe_allow_html=True)
+
+    if "avulso_items" not in st.session_state:
+        st.session_state["avulso_items"] = []
+
+    aba_selecionada_av = "BASE_PAGAMENTOS"
+
+    # Formulário de entrada
+    with st.container(border=True):
+        # Linha 1 — Nome e CPF
+        col_av_nome, col_av_cpf = st.columns(2)
+        with col_av_nome:
+            av_nome = st.text_input(
+                "Nome do Cliente",
+                key="av_nome",
+                placeholder="Ex: JOÃO SILVA SANTOS",
+            )
+        with col_av_cpf:
+            av_cpf = st.text_input(
+                "CPF",
+                key="av_cpf",
+                placeholder="000.000.000-00",
+            )
+
+        # Linha 2 — Vendedor | Categoria | Produto (cascata)
+        col_av_vend, col_av_cat, col_av_prod = st.columns(3)
+        with col_av_vend:
+            av_vendedor = st.selectbox(
+                "Vendedor",
+                options=sorted(VENDEDOR_EQUIPE.keys()),
+                key="av_vendedor",
+            )
+            _av_equipe = lookup_vendedor(av_vendedor)
+            st.caption(f"🏢 Equipe: **{_av_equipe}**")
+
+        with col_av_cat:
+            av_cat = st.selectbox(
+                "Categoria",
+                options=list(PRODUTOS_AVULSO.keys()),
+                key="av_categoria",
+            )
+
+        with col_av_prod:
+            # Chave dinâmica garante reset ao trocar de categoria
+            av_prod = st.selectbox(
+                "Produto",
+                options=PRODUTOS_AVULSO[av_cat],
+                key=f"av_produto_{av_cat}",
+            )
+            _av_pts = PONTOS_AVULSO.get(av_prod, 0)
+            st.caption(f"⭐ Pontos: **{_av_pts}**")
+
+        # Botão Adicionar
+        col_av_add, _col_sp = st.columns([1, 4])
+        with col_av_add:
+            av_add = st.button("➕ Adicionar à lista", key="av_add", use_container_width=True)
+
+    if av_add:
+        if not av_nome.strip():
+            st.warning("⚠️ Informe o nome do cliente.")
+        elif not av_cpf.strip():
+            st.warning("⚠️ Informe o CPF.")
+        else:
+            st.session_state["avulso_items"].append({
+                "nome":      av_nome.strip().upper(),
+                "cpf":       av_cpf.strip(),
+                "vendedor":  av_vendedor,
+                "equipe":    _av_equipe,
+                "categoria": av_cat,
+                "produto":   av_prod,
+                "pontos":    _av_pts,
+                "data":      datetime.now().strftime("%d/%m/%Y"),
+            })
+            st.rerun()
+
+    # Prévia da fila e botão de inserção
+    if st.session_state["avulso_items"]:
+        _av_items = st.session_state["avulso_items"]
+        st.success(f"**{len(_av_items)} item(ns)** na fila — confira abaixo antes de inserir na planilha.")
+
+        _av_df = pd.DataFrame([
+            {
+                "Nome":      it["nome"],
+                "CPF":       it["cpf"],
+                "Vendedor":  it["vendedor"],
+                "Equipe":    it["equipe"],
+                "Categoria": it["categoria"],
+                "Produto":   it["produto"],
+                "Pontos":    it["pontos"],
+            }
+            for it in _av_items
+        ])
+        st.dataframe(_av_df, use_container_width=True, hide_index=True)
+
+        col_av_ins, col_av_lim = st.columns([4, 1])
+
+        with col_av_lim:
+            if st.button("🗑️ Limpar", key="av_clear", use_container_width=True):
+                st.session_state["avulso_items"] = []
+                st.rerun()
+
+        with col_av_ins:
+            if not excel_ok:
+                st.warning("Faça login com sua conta Microsoft nas Configurações para habilitar a inserção.")
+            else:
+                if st.button(
+                    f"✅ Inserir {len(_av_items)} item(ns) na planilha → aba {aba_selecionada_av}",
+                    type="primary",
+                    key="av_inserir",
+                    use_container_width=True,
+                ):
+                    try:
+                        with st.spinner(f"⏳ Inserindo {len(_av_items)} item(ns) na planilha…"):
+                            _av_ini = inserir_e_colorir_excel(_av_items, az_client_id, excel_url, aba_selecionada_av)
+                        st.success(
+                            f"✅ **{len(_av_items)} item(ns)** inserido(s) com sucesso na aba "
+                            f"**{aba_selecionada_av}** a partir da linha **{_av_ini}**!"
+                        )
+                        st.session_state["avulso_items"] = []
                         st.balloons()
                     except Exception as e:
                         st.error(f"❌ Erro ao inserir: {e}")
