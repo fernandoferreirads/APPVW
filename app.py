@@ -65,6 +65,19 @@ VENDEDOR_EQUIPE = {
     "THOMAS RAVELLI RODRIGUES DE GODOI":      "SN",
 }
 
+FINANCEIRAS = [
+    "BV Financeira",
+    "Santander",
+    "Itaú",
+    "Bradesco",
+    "Banco do Brasil",
+    "Caixa Econômica Federal",
+    "Safra",
+    "Votorantim",
+    "C6 Bank",
+    "Porto Seguro",
+]
+
 PONTOS_PRODUTO = {
     "GE 1": 0.50,
     "GE 2": 1.00,
@@ -286,6 +299,34 @@ def para_linha_sheets(d: dict) -> list:
         d["vendedor"],          # U  - VENDEDOR
         d["retorno"],           # V  - RETORNO
         d["pontos"],            # W  - PONTOS
+    ]
+
+
+def calcular_retorno_outro_banco(valor_financiado: float, tipo_retorno: str) -> float:
+    if tipo_retorno == "R3":
+        return round(valor_financiado * 0.036 * 0.08, 2)
+    if tipo_retorno == "R2":
+        return round(valor_financiado * 0.024 * 0.06, 2)
+    if tipo_retorno == "R1":
+        return round(valor_financiado * 0.012 * 0.04, 2)
+    return 0.0
+
+
+def para_linha_outros_bancos(item: dict) -> list:
+    """Gera a linha para a aba OUTROS_BANCOS (colunas A–L, 12 colunas)."""
+    return [
+        item["mes"],              # A - MÊS
+        item["data_pagamento"],   # B - DATA PAGAMENTO
+        item["financeira"],       # C - FINANCEIRA
+        item["equipe"],           # D - EQUIPE
+        item["cpf_cnpj"],         # E - CPF/CNPJ
+        item["cliente"],          # F - CLIENTE
+        item["valor_financiado"], # G - VALOR FINANCIADO
+        item["spf"],              # H - SPF
+        item["n_s"],              # I - N/S
+        item["tipo_retorno"],     # J - TIPO RETORNO
+        item["vendedor"],         # K - VENDEDOR
+        item["retorno"],          # L - RETORNO
     ]
 
 
@@ -616,9 +657,11 @@ def _fazer_insercao(
 ) -> int:
     """Executa a inserção e, opcionalmente, a coloração em paralelo.
     Em caso de erro de sessão expirada, invalida e repropaga."""
-    linha_ini = _proxima_linha_excel(base_url, hdrs)
-    n         = len(linhas)
-    address   = f"A{linha_ini}:W{linha_ini + n - 1}"
+    linha_ini  = _proxima_linha_excel(base_url, hdrs)
+    n          = len(linhas)
+    n_cols     = len(linhas[0]) if linhas else 23
+    ultima_col = chr(64 + n_cols) if n_cols <= 26 else "W"
+    address    = f"A{linha_ini}:{ultima_col}{linha_ini + n - 1}"
     r = requests.patch(
         f"{base_url}/range(address='{address}')",
         headers=hdrs,
@@ -632,7 +675,7 @@ def _fazer_insercao(
     if colorir_map:
         def _colorir(row: int, cor: str) -> None:
             requests.patch(
-                f"{base_url}/range(address='A{row}:W{row}')/format/fill",
+                f"{base_url}/range(address='A{row}:{ultima_col}{row}')/format/fill",
                 headers=hdrs,
                 json={"color": cor},
                 timeout=15,
@@ -1452,6 +1495,204 @@ with _tab_c:
                             f"**{aba_selecionada_av}** a partir da linha **{_av_ini}**!"
                         )
                         st.session_state["avulso_items"] = []
+                        st.balloons()
+                    except Exception as e:
+                        st.error(f"❌ Erro ao inserir: {e}")
+
+    # ── Outros Bancos ─────────────────────────────────────────────────────────
+    st.markdown(
+        '<hr style="border:none;border-top:2px solid #eaecf4;margin:2.5rem 0 1.5rem 0;">',
+        unsafe_allow_html=True,
+    )
+    st.markdown("""
+<div class="section-title">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+         stroke="#001e50" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+        <line x1="3" y1="9" x2="21" y2="9"/>
+        <line x1="9" y1="21" x2="9" y2="9"/>
+    </svg>
+    <span>Outros Bancos</span>
+</div>
+<p style="color:#6b7280;font-size:0.875rem;margin:-0.5rem 0 1.25rem 32px;">
+    Financiamentos realizados por outras instituições financeiras
+</p>
+""", unsafe_allow_html=True)
+
+    if "ob_items" not in st.session_state:
+        st.session_state["ob_items"] = []
+
+    _aba_ob = "OUTROS_BANCOS"
+    _vendedores_ob = sorted(VENDEDOR_EQUIPE.keys()) + ["[ Outro... ]"]
+
+    with st.container(border=True):
+        col_ob1, col_ob2, col_ob3 = st.columns(3)
+        with col_ob1:
+            ob_financeira = st.selectbox(
+                "Financeira *",
+                options=[""] + FINANCEIRAS,
+                key="ob_financeira",
+            )
+        with col_ob2:
+            ob_cpf = st.text_input(
+                "CPF/CNPJ *",
+                key="ob_cpf",
+                placeholder="000.000.000-00",
+            )
+        with col_ob3:
+            ob_cliente = st.text_input(
+                "Cliente *",
+                key="ob_cliente",
+                placeholder="Nome completo",
+            )
+
+        col_ob4, col_ob5, col_ob6, col_ob7 = st.columns(4)
+        with col_ob4:
+            ob_valor = st.number_input(
+                "Valor Financiado *",
+                key="ob_valor",
+                min_value=0.0,
+                step=1000.0,
+                format="%.2f",
+            )
+        with col_ob5:
+            ob_spf = st.selectbox(
+                "SPF *",
+                options=["", "Sim", "Não"],
+                key="ob_spf",
+            )
+        with col_ob6:
+            ob_ns = st.selectbox(
+                "Novo/Seminovo *",
+                options=["", "Novo", "Seminovo"],
+                key="ob_ns",
+            )
+        with col_ob7:
+            ob_tipo_retorno = st.selectbox(
+                "Tipo de Retorno *",
+                options=["", "R1", "R2", "R3"],
+                key="ob_tipo_retorno",
+            )
+
+        col_ob8, col_ob9 = st.columns([2, 3])
+        with col_ob8:
+            ob_vend_sel = st.selectbox(
+                "Vendedor *",
+                options=[""] + _vendedores_ob,
+                key="ob_vendedor_sel",
+            )
+            if ob_vend_sel == "[ Outro... ]":
+                ob_vendedor = st.text_input(
+                    "Nome do vendedor",
+                    key="ob_vendedor_manual",
+                    placeholder="Digite o nome completo em MAIÚSCULAS",
+                )
+            else:
+                ob_vendedor = ob_vend_sel
+            if ob_vendedor and ob_vendedor != "[ Outro... ]":
+                _ob_equipe = lookup_vendedor(ob_vendedor)
+                st.caption(f"🏢 Equipe: **{_ob_equipe}**")
+            else:
+                _ob_equipe = ""
+
+        with col_ob9:
+            if ob_valor > 0 and ob_tipo_retorno:
+                _ob_retorno_prev = calcular_retorno_outro_banco(ob_valor, ob_tipo_retorno)
+                st.metric("Retorno calculado", f"R$ {_ob_retorno_prev:,.2f}")
+
+        col_ob_add, _ = st.columns([1, 4])
+        with col_ob_add:
+            ob_add = st.button("➕ Adicionar à lista", key="ob_add", use_container_width=True)
+
+    if ob_add:
+        _ob_erros = []
+        if not ob_financeira:
+            _ob_erros.append("Financeira")
+        if not ob_cpf.strip():
+            _ob_erros.append("CPF/CNPJ")
+        if not ob_cliente.strip():
+            _ob_erros.append("Cliente")
+        if ob_valor <= 0:
+            _ob_erros.append("Valor Financiado")
+        if not ob_spf:
+            _ob_erros.append("SPF")
+        if not ob_ns:
+            _ob_erros.append("Novo/Seminovo")
+        if not ob_tipo_retorno:
+            _ob_erros.append("Tipo de Retorno")
+        if not ob_vendedor or ob_vendedor == "[ Outro... ]":
+            _ob_erros.append("Vendedor")
+
+        if _ob_erros:
+            st.warning(f"⚠️ Preencha os campos obrigatórios: **{', '.join(_ob_erros)}**")
+        else:
+            _ob_now   = datetime.now()
+            _ob_data  = _ob_now.strftime("%d/%m/%Y")
+            _ob_mes   = f"{MESES_PT[_ob_now.month]}/{_ob_now.year}"
+            _ob_ret   = calcular_retorno_outro_banco(ob_valor, ob_tipo_retorno)
+            _ob_eq    = lookup_vendedor(ob_vendedor) if ob_vendedor else ""
+            st.session_state["ob_items"].append({
+                "mes":              _ob_mes,
+                "data_pagamento":   _ob_data,
+                "financeira":       ob_financeira,
+                "equipe":           _ob_eq,
+                "cpf_cnpj":         ob_cpf.strip(),
+                "cliente":          ob_cliente.strip().upper(),
+                "valor_financiado": ob_valor,
+                "spf":              ob_spf,
+                "n_s":              ob_ns,
+                "tipo_retorno":     ob_tipo_retorno,
+                "vendedor":         ob_vendedor,
+                "retorno":          _ob_ret,
+            })
+            st.rerun()
+
+    if st.session_state["ob_items"]:
+        _ob_items = st.session_state["ob_items"]
+        st.success(f"**{len(_ob_items)} contrato(s)** na fila — confira abaixo antes de inserir na planilha.")
+
+        _ob_df = pd.DataFrame([
+            {
+                "Financeira":     it["financeira"],
+                "CPF/CNPJ":       it["cpf_cnpj"],
+                "Cliente":        it["cliente"],
+                "Vr. Financiado": f"R$ {it['valor_financiado']:,.2f}",
+                "SPF":            it["spf"],
+                "N/S":            it["n_s"],
+                "Tipo Retorno":   it["tipo_retorno"],
+                "Vendedor":       it["vendedor"],
+                "Equipe":         it["equipe"],
+                "Retorno":        f"R$ {it['retorno']:,.2f}",
+            }
+            for it in _ob_items
+        ])
+        st.dataframe(_ob_df, use_container_width=True, hide_index=True)
+
+        col_ob_ins, col_ob_lim = st.columns([4, 1])
+        with col_ob_lim:
+            if st.button("🗑️ Limpar", key="ob_clear", use_container_width=True):
+                st.session_state["ob_items"] = []
+                st.rerun()
+
+        with col_ob_ins:
+            if not excel_ok:
+                st.warning("Faça login com sua conta Microsoft nas Configurações para habilitar a inserção.")
+            else:
+                if st.button(
+                    f"✅ Inserir {len(_ob_items)} contrato(s) na planilha → aba {_aba_ob}",
+                    type="primary",
+                    key="ob_inserir",
+                    use_container_width=True,
+                ):
+                    try:
+                        with st.spinner(f"⏳ Inserindo {len(_ob_items)} contrato(s) na planilha…"):
+                            _ob_linhas = [para_linha_outros_bancos(it) for it in _ob_items]
+                            _ob_ini = inserir_linhas_excel(_ob_linhas, az_client_id, excel_url, _aba_ob)
+                        st.success(
+                            f"✅ **{len(_ob_items)} contrato(s)** inserido(s) com sucesso na aba "
+                            f"**{_aba_ob}** a partir da linha **{_ob_ini}**!"
+                        )
+                        st.session_state["ob_items"] = []
                         st.balloons()
                     except Exception as e:
                         st.error(f"❌ Erro ao inserir: {e}")
