@@ -1481,7 +1481,7 @@ with _tab_c:
         else:
             _ob_now   = datetime.now()
             _ob_data  = _ob_now.strftime("%d/%m/%Y")
-            _ob_mes   = f"{MESES_PT[_ob_now.month]}/{_ob_now.year}"
+            _ob_mes   = _ob_now.month
             _ob_ret   = calcular_retorno_outro_banco(ob_valor, ob_tipo_retorno)
             _ob_eq    = lookup_vendedor(ob_vendedor) if ob_vendedor else ""
             st.session_state["ob_items"].append({
