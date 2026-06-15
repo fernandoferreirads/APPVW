@@ -770,6 +770,185 @@ def _gerar_xlsx(resultado: dict) -> bytes:
     return buf.getvalue()
 
 
+def _gerar_xlsx_equipe(equipe: str, resultados: list, data_ini, data_fim) -> bytes:
+    """XLSX de equipe: Resumo comparativo + uma aba por vendedor (KPIs + por_produto)."""
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    _AZUL      = "001E50"
+    _CINZA     = "F2F4F8"
+    _fmt_moeda = "R$ #,##0.00"
+    _hdr_font  = Font(bold=True, color="FFFFFF", size=11)
+    _hdr_fill  = PatternFill("solid", fgColor=_AZUL)
+    _hdr_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    def _auto_width(ws):
+        for col in ws.columns:
+            ltr = col[0].column_letter
+            mx  = max((len(str(c.value or "")) for c in col), default=8)
+            ws.column_dimensions[ltr].width = min(mx + 4, 50)
+
+    def _titulo(ws, texto, n_cols, height=28):
+        ws.merge_cells(f"A1:{chr(64 + min(n_cols, 26))}1")
+        t = ws["A1"]
+        t.value     = texto
+        t.font      = Font(bold=True, color="FFFFFF", size=12)
+        t.fill      = PatternFill("solid", fgColor=_AZUL)
+        t.alignment = Alignment(horizontal="center", vertical="center")
+        ws.row_dimensions[1].height = height
+
+    def _hdr_row(ws, row, headers):
+        for c, h in enumerate(headers, 1):
+            cell = ws.cell(row, c, value=h)
+            cell.font      = _hdr_font
+            cell.fill      = _hdr_fill
+            cell.alignment = _hdr_align
+        ws.row_dimensions[row].height = 22
+
+    wb         = Workbook()
+    periodo_str = (f"{data_ini.strftime('%d/%m/%Y')} → "
+                   f"{data_fim.strftime('%d/%m/%Y')}")
+
+    # ── Aba 1: Resumo Equipe ─────────────────────────────────────────────────
+    ws1   = wb.active
+    ws1.title = "Resumo Equipe"
+    _RES_HDR = [
+        "Vendedor", "Contratos VW", "Produtos",
+        "Comissão Produtos (R$)", "Retorno VW (R$)", "Subtotal VW (R$)",
+        "SPF Outros Bancos (R$)", "Retorno Outros Bancos (R$)", "Total Geral (R$)",
+    ]
+    n_cols_res = len(_RES_HDR)
+
+    _titulo(ws1, f"RELATÓRIO DE EQUIPE — {equipe} — {periodo_str}", n_cols_res)
+    _hdr_row(ws1, 2, _RES_HDR)
+    ws1.freeze_panes = "A3"
+
+    tots = {"contr": 0, "prod": 0,
+            "com": 0.0, "ret_vw": 0.0, "sub_vw": 0.0,
+            "spf_ob": 0.0, "ret_ob": 0.0, "tg": 0.0}
+
+    for res in resultados:
+        ob_spf = res.get("ob_spf_commission",     0.0)
+        ob_ret = res.get("ob_retorno_commission",  0.0)
+        tg     = res["total_bruto"] + ob_spf + ob_ret
+        ws1.append([
+            res["vendedor"],
+            res["total_contratos"],
+            res["total_produtos"],
+            res["total_comissao"],
+            res["total_retorno"],
+            res["total_bruto"],
+            ob_spf, ob_ret, tg,
+        ])
+        rn = ws1.max_row
+        for c in range(4, n_cols_res + 1):
+            ws1.cell(rn, c).number_format = _fmt_moeda
+        tots["contr"]  += res["total_contratos"]
+        tots["prod"]   += res["total_produtos"]
+        tots["com"]    += res["total_comissao"]
+        tots["ret_vw"] += res["total_retorno"]
+        tots["sub_vw"] += res["total_bruto"]
+        tots["spf_ob"] += ob_spf
+        tots["ret_ob"] += ob_ret
+        tots["tg"]     += tg
+
+    ws1.append([
+        "TOTAL", tots["contr"], tots["prod"],
+        tots["com"], tots["ret_vw"], tots["sub_vw"],
+        tots["spf_ob"], tots["ret_ob"], tots["tg"],
+    ])
+    rn = ws1.max_row
+    for c in range(1, n_cols_res + 1):
+        ws1.cell(rn, c).font = Font(bold=True, color="FFFFFF")
+        ws1.cell(rn, c).fill = PatternFill("solid", fgColor=_AZUL)
+    for c in range(4, n_cols_res + 1):
+        ws1.cell(rn, c).number_format = _fmt_moeda
+    _auto_width(ws1)
+
+    # ── Abas por vendedor ────────────────────────────────────────────────────
+    for res in resultados:
+        vend_name  = res["vendedor"]
+        sname      = vend_name[:31]
+        for ch in ['/', '\\', '?', '*', '[', ']', ':']:
+            sname = sname.replace(ch, '')
+        sname = sname.strip() or "Vendedor"
+
+        ws = wb.create_sheet(sname)
+        ws.column_dimensions["A"].width = 36
+        ws.column_dimensions["B"].width = 22
+
+        _titulo(ws, vend_name, 2, height=26)
+
+        ob_spf   = res.get("ob_spf_commission",     0.0)
+        ob_ret   = res.get("ob_retorno_commission",  0.0)
+        ob_tot   = ob_spf + ob_ret
+        has_ob   = ob_tot > 0 or res.get("ob_total_contratos", 0) > 0
+        tg       = res["total_bruto"] + ob_tot
+
+        kpis = [
+            ("Período",                  periodo_str,             False),
+            (None, None, False),
+            ("Contratos no período (VW)", res["total_contratos"], False),
+            ("Produtos produzidos",       res["total_produtos"],   False),
+            (None, None, False),
+            ("Comissão de Produtos",     res["total_comissao"],   False),
+            ("Retorno de Financiamento", res["total_retorno"],    False),
+            ("Subtotal Banco VW",        res["total_bruto"],      True),
+        ]
+        if has_ob:
+            kpis += [
+                (None, None, False),
+                ("Comissão SPF — Outros Bancos",     ob_spf, False),
+                ("Comissão Retorno — Outros Bancos", ob_ret, False),
+            ]
+        kpis += [(None, None, False), ("TOTAL GERAL", tg, True)]
+
+        row_ptr = 2
+        for label, value, bold in kpis:
+            if label is None:
+                row_ptr += 1
+                continue
+            ca = ws.cell(row_ptr, 1, value=label)
+            cb = ws.cell(row_ptr, 2, value=value)
+            ca.font = Font(bold=bold)
+            cb.font = Font(bold=bold)
+            if label == "TOTAL GERAL":
+                for cell in (ca, cb):
+                    cell.fill = PatternFill("solid", fgColor=_AZUL)
+                    cell.font = Font(bold=True, color="FFFFFF")
+            if isinstance(value, float):
+                cb.number_format = _fmt_moeda
+            row_ptr += 1
+
+        # Por Produto section
+        row_ptr += 1
+        ws.cell(row_ptr, 1, value="POR PRODUTO").font = Font(bold=True, size=11)
+        row_ptr += 1
+
+        _PP_HDR = ["Categoria", "Produto", "Qtd", "Comissão Unit. (R$)", "Total (R$)"]
+        _hdr_row(ws, row_ptr, _PP_HDR)
+        for c in ("C", "D", "E"):
+            ws.column_dimensions[c].width = 10 if c == "C" else 22
+        row_ptr += 1
+
+        pp_rows = res.get("por_produto", [])
+        for pp in pp_rows:
+            ws.cell(row_ptr, 1, value=pp["categoria"])
+            ws.cell(row_ptr, 2, value=pp["produto"])
+            ws.cell(row_ptr, 3, value=pp["qtd"])
+            ws.cell(row_ptr, 4, value=pp["unit"]).number_format = _fmt_moeda
+            ws.cell(row_ptr, 5, value=pp["total"]).number_format = _fmt_moeda
+            row_ptr += 1
+
+        if not pp_rows:
+            ws.cell(row_ptr, 1, value="Sem produtos com comissão no período")
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 def _render_kpis(summary: dict) -> None:
     # ── Linha 1: quadro financeiro principal ──────────────────────────────────
     st.markdown("""
@@ -1145,6 +1324,109 @@ def render_comissao(client_id: str = "", sharing_url: str = "") -> None:
         summary["ob_total_contratos"]    = ob_result["total_contratos"]
         summary["df_ob_filtrado"]        = ob_result.get("df_filtrado", pd.DataFrame())
         st.session_state["comm_resultado"] = summary
+
+    # ── Relatório de Equipe ────────────────────────────────────────────────────
+    st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+    with st.expander("📊 Relatório de Equipe — Exportar XLSX", expanded=False):
+        with st.container(border=True):
+            col_eq, col_eq1, col_eq2, col_eq_btn = st.columns([2, 2, 2, 1])
+            with col_eq:
+                _equipes_disp = (
+                    sorted(df_base["equipe"].dropna().str.strip().str.upper().unique())
+                    if "equipe" in df_base.columns else []
+                )
+                equipe_sel_eq = st.selectbox(
+                    "Equipe",
+                    options=[""] + _equipes_disp,
+                    format_func=lambda x: "Selecione uma equipe..." if x == "" else x,
+                    key="comm_equipe_sel",
+                )
+            with col_eq1:
+                eq_ini = st.date_input(
+                    "Data inicial",
+                    value=date.today().replace(day=1),
+                    key="comm_eq_ini",
+                    format="DD/MM/YYYY",
+                )
+            with col_eq2:
+                eq_fim = st.date_input(
+                    "Data final",
+                    value=date.today(),
+                    key="comm_eq_fim",
+                    format="DD/MM/YYYY",
+                )
+            with col_eq_btn:
+                st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+                gerar_eq = st.button(
+                    "📊 Gerar",
+                    key="comm_eq_gerar",
+                    type="primary",
+                    use_container_width=True,
+                )
+
+        if gerar_eq:
+            if not equipe_sel_eq:
+                st.warning("⚠️ Selecione uma equipe.")
+            elif eq_ini > eq_fim:
+                st.warning("⚠️ Data inicial deve ser anterior à data final.")
+            else:
+                mask_eq = (
+                    df_base["equipe"].fillna("").str.strip().str.upper()
+                    == equipe_sel_eq.upper()
+                )
+                vendedores_eq = sorted(
+                    df_base[mask_eq]["vendedor"].dropna().str.strip().unique()
+                ) if "equipe" in df_base.columns else []
+
+                if not vendedores_eq:
+                    st.warning(f"⚠️ Nenhum vendedor encontrado para **{equipe_sel_eq}**.")
+                else:
+                    df_ob_eq, ob_err_eq = load_outros_bancos(client_id, sharing_url)
+                    if ob_err_eq:
+                        df_ob_eq = pd.DataFrame()
+
+                    resultados_eq = []
+                    with st.spinner(
+                        f"⏳ Processando {len(vendedores_eq)} vendedores…"
+                    ):
+                        for vend in vendedores_eq:
+                            df_v    = filter_records(df_base, vend, eq_ini, eq_fim)
+                            summ_v  = calc_commission(df_v)
+                            ob_v    = calc_commission_outros_bancos(
+                                df_ob_eq if df_ob_eq is not None else pd.DataFrame(),
+                                vend, eq_ini, eq_fim,
+                            )
+                            summ_v["vendedor"]              = vend
+                            summ_v["data_ini"]              = eq_ini
+                            summ_v["data_fim"]              = eq_fim
+                            summ_v["df_filtrado"]           = df_v
+                            summ_v["ob_spf_commission"]     = ob_v["spf_commission"]
+                            summ_v["ob_retorno_commission"] = ob_v["retorno_commission"]
+                            summ_v["ob_total_contratos"]    = ob_v["total_contratos"]
+                            summ_v["df_ob_filtrado"]        = ob_v.get("df_filtrado", pd.DataFrame())
+                            resultados_eq.append(summ_v)
+
+                    xlsx_eq  = _gerar_xlsx_equipe(equipe_sel_eq, resultados_eq, eq_ini, eq_fim)
+                    nome_eq  = (
+                        f"Comissao_Equipe_{equipe_sel_eq.replace(' ', '_')}_"
+                        f"{eq_ini.strftime('%d%m%Y')}-{eq_fim.strftime('%d%m%Y')}.xlsx"
+                    )
+                    st.session_state["comm_eq_xlsx"]   = xlsx_eq
+                    st.session_state["comm_eq_nome"]   = nome_eq
+                    st.session_state["comm_eq_nvend"]  = len(vendedores_eq)
+
+        eq_xlsx = st.session_state.get("comm_eq_xlsx")
+        if eq_xlsx:
+            col_dl, _ = st.columns([1, 4])
+            with col_dl:
+                st.download_button(
+                    f"📥 Baixar ({st.session_state.get('comm_eq_nvend', 0)} vendedores)",
+                    data=eq_xlsx,
+                    file_name=st.session_state.get("comm_eq_nome", "relatorio_equipe.xlsx"),
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                    key="comm_eq_download",
+                )
 
     # ── Exibe resultado ────────────────────────────────────────────────────────
     resultado = st.session_state.get("comm_resultado")
