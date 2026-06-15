@@ -610,9 +610,12 @@ def _gerar_xlsx(resultado: dict) -> bytes:
     _tot_font  = Font(bold=True)
 
     def _auto_width(ws):
+        from openpyxl.utils import get_column_letter
         for col in ws.columns:
-            ltr = col[0].column_letter
-            mx  = max((len(str(c.value or "")) for c in col), default=8)
+            if not col:
+                continue
+            ltr = get_column_letter(col[0].column)
+            mx  = max((len(str(c.value or "")) for c in col if c.value is not None), default=8)
             ws.column_dimensions[ltr].width = min(mx + 4, 52)
 
     def _style_header(ws, n_cols):
@@ -784,9 +787,12 @@ def _gerar_xlsx_equipe(equipe: str, resultados: list, data_ini, data_fim) -> byt
     _hdr_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
     def _auto_width(ws):
+        from openpyxl.utils import get_column_letter
         for col in ws.columns:
-            ltr = col[0].column_letter
-            mx  = max((len(str(c.value or "")) for c in col), default=8)
+            if not col:
+                continue
+            ltr = get_column_letter(col[0].column)
+            mx  = max((len(str(c.value or "")) for c in col if c.value is not None), default=8)
             ws.column_dimensions[ltr].width = min(mx + 4, 50)
 
     def _titulo(ws, texto, n_cols, height=28):
