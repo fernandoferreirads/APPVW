@@ -575,30 +575,48 @@ def _excel_hdrs(token: str, session_id: str = "") -> dict:
 
 def _proxima_linha_excel(base_url: str, hdrs: dict) -> int:
     """Retorna a 1ª linha VAZIA verificando TODAS as colunas da aba.
-    Nunca sobrescreve linhas que contenham qualquer dado preenchido."""
-    r = requests.get(
-        f"{base_url}/usedRange",
+    Lê apenas os metadados + as últimas 30 linhas — O(constante), independe do tamanho."""
+    # Passo 1: metadados leves para saber onde o usedRange termina
+    r1 = requests.get(
+        f"{base_url}/usedRange?$select=rowIndex,rowCount,columnCount",
         headers=hdrs,
-        timeout=20,
+        timeout=15,
     )
-    if r.status_code != 200:
+    if r1.status_code != 200:
         return 2
     try:
-        data = r.json()
+        meta = r1.json()
     except Exception:
         return 2
 
-    row_index = data.get("rowIndex", 0)
-    row_count = data.get("rowCount", 0)
-    values    = data.get("values", [])
+    row_index  = meta.get("rowIndex", 0)
+    row_count  = meta.get("rowCount", 0)
+    col_count  = meta.get("columnCount", 23)
 
-    if not values or row_count == 0:
+    if row_count == 0:
         return max(row_index + 1, 2)
+
+    # Passo 2: lê apenas as últimas 30 linhas em todas as colunas
+    last_row   = row_index + row_count          # última linha usada (base-1 Excel)
+    first_scan = max(last_row - 29, 1)          # no máximo 30 linhas, mínimo linha 1
+    col_letter = chr(64 + min(col_count, 26))   # ex: 23 cols → "W"
+
+    r2 = requests.get(
+        f"{base_url}/range(address='{chr(65)}{first_scan}:{col_letter}{last_row}')",
+        headers=hdrs,
+        timeout=15,
+    )
+    if r2.status_code != 200:
+        return last_row + 1
+    try:
+        values = r2.json().get("values", [])
+    except Exception:
+        return last_row + 1
 
     # Varre de baixo para cima — primeira linha com qualquer célula preenchida
     for i in range(len(values) - 1, -1, -1):
         if any(cell not in ("", None, 0) for cell in values[i]):
-            return row_index + i + 2  # próxima linha, base-1
+            return first_scan + i + 1  # linha seguinte, base-1
 
     return max(row_index + 1, 2)
 
