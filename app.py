@@ -66,16 +66,15 @@ VENDEDOR_EQUIPE = {
 }
 
 FINANCEIRAS = [
-    "BV Financeira",
-    "Santander",
-    "Itaú",
+    "BBC",
     "Bradesco",
-    "Banco do Brasil",
-    "Caixa Econômica Federal",
+    "BV",
+    "C6",
+    "Ford",
+    "Ítau",
+    "PAN",
     "Safra",
-    "Votorantim",
-    "C6 Bank",
-    "Porto Seguro",
+    "Santander",
 ]
 
 PONTOS_PRODUTO = {
