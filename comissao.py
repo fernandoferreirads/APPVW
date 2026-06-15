@@ -165,8 +165,10 @@ def _build_bigbase_df(values: list[list]) -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
-_BIGBASE_TAB  = "BASE_PAGAMENTOS"
-_CACHE_TTL    = 300   # segundos (5 min)
+_BIGBASE_TAB        = "BASE_PAGAMENTOS"
+_ABA_OUTROS_BANCOS  = "OUTROS_BANCOS"
+_SPF_FINANCEIRAS_OB = {"BRADESCO", "ITAU", "ITAÚ", "SAFRA", "SANTANDER"}
+_CACHE_TTL          = 300   # segundos (5 min)
 
 
 # ─── Camada de Leitura — Graph API ────────────────────────────────────────────
@@ -352,6 +354,85 @@ def load_bigbase(client_id: str, sharing_url: str) -> tuple[pd.DataFrame | None,
         return None, f"❌ {exc}"
 
 
+def load_outros_bancos(client_id: str, sharing_url: str) -> tuple[pd.DataFrame | None, str]:
+    """
+    Lê aba OUTROS_BANCOS (12 colunas A-L) com cache de 5 min.
+    Retorna (df, "") em sucesso, (DataFrame vazio, "") se aba não existe,
+    (None, "mensagem") em erro de autenticação/acesso.
+    """
+    st.session_state["_comm_client_id"] = client_id
+
+    cache_key = "_comm_df_ob"
+    ts_key    = "_comm_ts_ob"
+
+    cached    = st.session_state.get(cache_key)
+    cached_ts = st.session_state.get(ts_key, 0)
+    if cached is not None and time.time() - cached_ts < _CACHE_TTL:
+        return cached, ""
+
+    _OB_COLS = ["mes", "data_pagamento", "financeira", "equipe",
+                "cpf_cnpj", "cliente", "valor_financiado", "spf",
+                "n_s", "tipo_retorno", "vendedor", "retorno"]
+
+    try:
+        token             = _ms_token()
+        drive_id, item_id = _resolve_file(token, sharing_url)
+        ws_id             = _find_ws_id(token, drive_id, item_id, _ABA_OUTROS_BANCOS)
+        values            = _read_range(token, drive_id, item_id, ws_id)
+
+        if not values or len(values) < 2:
+            df = pd.DataFrame(columns=_OB_COLS)
+            st.session_state[cache_key] = df
+            st.session_state[ts_key]    = time.time()
+            return df, ""
+
+        records = []
+        for row in values[1:]:
+            record = {col: (row[i] if i < len(row) else None)
+                      for i, col in enumerate(_OB_COLS)}
+            records.append(record)
+
+        df = pd.DataFrame(records).dropna(how="all")
+
+        for col in ("retorno", "valor_financiado"):
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        if "data_pagamento" in df.columns:
+            def _parse_ob_date(v):
+                if v is None or (isinstance(v, float) and pd.isna(v)):
+                    return pd.NaT
+                if isinstance(v, (int, float)):
+                    try:
+                        return pd.Timestamp("1899-12-30") + pd.Timedelta(days=int(v))
+                    except Exception:
+                        return pd.NaT
+                return pd.to_datetime(str(v), dayfirst=True, errors="coerce")
+
+            df["data_pagamento"] = df["data_pagamento"].apply(_parse_ob_date)
+
+        st.session_state[cache_key] = df
+        st.session_state[ts_key]    = time.time()
+        return df, ""
+
+    except requests.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else 0
+        msgs   = {
+            401: "❌ Token expirado. Reconecte sua conta Microsoft.",
+            403: "❌ Sem permissão de acesso (403).",
+            404: "❌ Arquivo não encontrado (404).",
+        }
+        return None, msgs.get(status, f"❌ Erro HTTP {status}.")
+    except Exception as exc:
+        # Aba não existe → retorna vazio sem erro
+        if "não encontrada" in str(exc).lower() or "not found" in str(exc).lower():
+            df = pd.DataFrame(columns=_OB_COLS)
+            st.session_state[cache_key] = df
+            st.session_state[ts_key]    = time.time()
+            return df, ""
+        return None, f"❌ {exc}"
+
+
 # ─── Camada de Filtro ─────────────────────────────────────────────────────────
 
 def filter_records(
@@ -377,6 +458,59 @@ def filter_records(
         ]
 
     return result.reset_index(drop=True)
+
+
+def calc_commission_outros_bancos(
+    df_ob: pd.DataFrame,
+    vendedor: str,
+    data_ini: date,
+    data_fim: date,
+) -> dict:
+    """
+    Filtra OUTROS_BANCOS por período e vendedor e calcula comissões.
+    Retorna dict com spf_commission, retorno_commission, total_contratos.
+    """
+    _zero = {"spf_commission": 0.0, "retorno_commission": 0.0, "total_contratos": 0}
+    if df_ob is None or df_ob.empty:
+        return _zero
+
+    df = df_ob.copy()
+
+    if "data_pagamento" in df.columns:
+        df = df[
+            df["data_pagamento"].notna()
+            & (df["data_pagamento"] >= pd.Timestamp(data_ini))
+            & (df["data_pagamento"] <= pd.Timestamp(data_fim))
+        ]
+
+    if vendedor and "vendedor" in df.columns:
+        vup = vendedor.upper().strip()
+        df = df[df["vendedor"].fillna("").str.upper().str.contains(vup, regex=False)]
+
+    if df.empty:
+        return _zero
+
+    # SPF: R$60 por contrato onde spf="SIM" E financeira qualifica
+    spf_mask = (
+        df.get("spf", pd.Series(dtype=str)).fillna("").str.upper().str.strip() == "SIM"
+    ) & (
+        df.get("financeira", pd.Series(dtype=str))
+          .fillna("").str.upper().str.strip()
+          .isin(_SPF_FINANCEIRAS_OB)
+    )
+    spf_commission = float(int(spf_mask.sum()) * 60.0)
+
+    # Retorno: soma da coluna L
+    retorno_commission = 0.0
+    if "retorno" in df.columns:
+        s = pd.to_numeric(df["retorno"], errors="coerce").sum()
+        retorno_commission = float(s) if not pd.isna(s) else 0.0
+
+    return {
+        "spf_commission":    spf_commission,
+        "retorno_commission": retorno_commission,
+        "total_contratos":   len(df),
+    }
 
 
 # ─── Camada de Cálculo de Comissão ────────────────────────────────────────────
@@ -489,6 +623,12 @@ def _render_kpis(summary: dict) -> None:
     </style>
     """, unsafe_allow_html=True)
 
+    ob_spf   = summary.get("ob_spf_commission", 0.0)
+    ob_ret   = summary.get("ob_retorno_commission", 0.0)
+    ob_total = ob_spf + ob_ret
+    has_ob   = ob_total > 0 or summary.get("ob_total_contratos", 0) > 0
+
+    # ── Linha 1: Banco VW ─────────────────────────────────────────────────────
     c1, c2, c3 = st.columns(3)
     with c1:
         st.markdown(f"""
@@ -503,15 +643,46 @@ def _render_kpis(summary: dict) -> None:
             <div class="value">R$ {summary['total_retorno']:,.2f}</div>
         </div>""", unsafe_allow_html=True)
     with c3:
-        st.markdown(f"""
-        <div class="comm-card highlight">
-            <div class="label">⭐ Total Bruto (Produtos + Retorno)</div>
-            <div class="value">R$ {summary['total_bruto']:,.2f}</div>
-        </div>""", unsafe_allow_html=True)
+        if has_ob:
+            st.markdown(f"""
+            <div class="comm-card">
+                <div class="label">🏦 Subtotal Banco VW</div>
+                <div class="value">R$ {summary['total_bruto']:,.2f}</div>
+            </div>""", unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div class="comm-card highlight">
+                <div class="label">⭐ Total Bruto (Produtos + Retorno)</div>
+                <div class="value">R$ {summary['total_bruto']:,.2f}</div>
+            </div>""", unsafe_allow_html=True)
+
+    # ── Linha 2: Outros Bancos (condicional) ──────────────────────────────────
+    if has_ob:
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        ob1, ob2, ob3 = st.columns(3)
+        with ob1:
+            st.markdown(f"""
+            <div class="comm-card">
+                <div class="label">🏦 Comissão SPF — Outros Bancos</div>
+                <div class="value">R$ {ob_spf:,.2f}</div>
+            </div>""", unsafe_allow_html=True)
+        with ob2:
+            st.markdown(f"""
+            <div class="comm-card">
+                <div class="label">💰 Comissão Retorno — Outros Bancos</div>
+                <div class="value">R$ {ob_ret:,.2f}</div>
+            </div>""", unsafe_allow_html=True)
+        with ob3:
+            total_geral = summary["total_bruto"] + ob_total
+            st.markdown(f"""
+            <div class="comm-card highlight">
+                <div class="label">⭐ Total Geral (VW + Outros Bancos)</div>
+                <div class="value">R$ {total_geral:,.2f}</div>
+            </div>""", unsafe_allow_html=True)
 
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
-    # ── Linha 2: contadores operacionais ─────────────────────────────────────
+    # ── Linha final: contadores operacionais ──────────────────────────────────
     with st.container(border=True):
         cc1, cc2 = st.columns(2)
         cc1.metric("📄 Contratos no período", f"{summary['total_contratos']:,}")
@@ -749,11 +920,24 @@ def render_comissao(client_id: str = "", sharing_url: str = "") -> None:
             st.session_state.pop("comm_resultado", None)
             return
 
+        # Carrega e calcula Outros Bancos (silencioso se aba não existir)
+        df_ob, ob_err = load_outros_bancos(client_id, sharing_url)
+        if ob_err:
+            st.warning(f"⚠️ Outros Bancos: {ob_err}")
+            df_ob = pd.DataFrame()
+        ob_result = calc_commission_outros_bancos(
+            df_ob if df_ob is not None else pd.DataFrame(),
+            vendedor_sel, data_ini, data_fim,
+        )
+
         summary = calc_commission(df_filtrado)
-        summary["vendedor"]     = vendedor_sel
-        summary["data_ini"]     = data_ini
-        summary["data_fim"]     = data_fim
-        summary["df_filtrado"]  = df_filtrado
+        summary["vendedor"]              = vendedor_sel
+        summary["data_ini"]              = data_ini
+        summary["data_fim"]              = data_fim
+        summary["df_filtrado"]           = df_filtrado
+        summary["ob_spf_commission"]     = ob_result["spf_commission"]
+        summary["ob_retorno_commission"] = ob_result["retorno_commission"]
+        summary["ob_total_contratos"]    = ob_result["total_contratos"]
         st.session_state["comm_resultado"] = summary
 
     # ── Exibe resultado ────────────────────────────────────────────────────────
@@ -800,5 +984,7 @@ def render_comissao(client_id: str = "", sharing_url: str = "") -> None:
         if st.button("🔄 Recarregar base", key="comm_reload", use_container_width=True):
             st.session_state.pop("_comm_df_bigbase", None)
             st.session_state.pop("_comm_ts_bigbase", None)
+            st.session_state.pop("_comm_df_ob", None)
+            st.session_state.pop("_comm_ts_ob", None)
             st.session_state.pop("comm_resultado", None)
             st.rerun()
