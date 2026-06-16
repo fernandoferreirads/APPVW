@@ -368,7 +368,7 @@ def _chart_produto(
             seja igual a esse texto (case-insensitive). Ex.: "SEGURO VW".
             Se None, conta qualquer valor não-vazio.
     """
-    meses = _meses_completos(7)
+    meses = _meses_range(7)
 
     if col not in df.columns or "data_pagto" not in df.columns:
         return _fig_sem_dados(
@@ -500,7 +500,7 @@ def _chart_sempre_novo(
     Diferente dos outros produtos: denominador = AAK manual (não total contratos).
     Coluna BIGBASE: sempre_novo (pos. 22, col W).
     """
-    meses = _meses_completos(7)
+    meses = _meses_range(7)
 
     if "sempre_novo" not in df.columns or "data_pagto" not in df.columns:
         return _fig_sem_dados(
@@ -607,7 +607,7 @@ def _chart_pontos(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     Barras azuis por mês + barra laranja TENDÊNCIA M.A.
     Sem linha % AAK — gráfico de barras simples.
     """
-    meses = _meses_completos(7)
+    meses = _meses_range(7)
 
     if "pontos" not in df.columns or "data_pagto" not in df.columns:
         return _fig_sem_dados(
@@ -691,7 +691,7 @@ def _chart_pontos_por_contrato(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFram
     PONTOS POR CONTRATO = sum(pontos) / (NV + SN) por mês.
     Barras azuis (MÉDIA) + barra laranja (TENDÊNCIA M.A) + linha laranja (META = 1.5).
     """
-    meses = _meses_completos(7)
+    meses = _meses_range(7)
 
     cols_req = {"pontos", "tipo_veiculo", "data_pagto"}
     if not cols_req.issubset(df.columns):
@@ -793,7 +793,7 @@ def _chart_spf(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     Total SPF = qualquer valor não-vazio; SPF Plus = contém 'PLUS'.
     Tabela com 4 linhas: Total Spfs, Spf Plus, % AAK, Aak Plus.
     """
-    meses = _meses_completos(7)
+    meses = _meses_range(7)
 
     if "spf" not in df.columns or "data_pagto" not in df.columns:
         return _fig_sem_dados(
