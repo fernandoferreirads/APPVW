@@ -193,7 +193,7 @@ _VENDEDOR_MATRICULA: dict[str, int | None] = {
     "FLAVIO PEREIRA DE SOUZA":              31667,
     "JAME WILLIAMS DA SILVA COSTA":         40782,
     "RODRIGO DA SILVA PAZ":                 26506,
-    "THIAGO TORRES DA SILVA GOUVES":        None,
+    "THIAGO TORRES DA SILVA GOUVES":        11111,
     "ANTONINO VITORINO DE SOUSA":           24061,
     "DOUGLAS OLIVEIRA DE MORAIS":           31755,
     "EDUARDO ALVES ROQUE":                  31754,
