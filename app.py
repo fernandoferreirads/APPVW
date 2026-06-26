@@ -1154,24 +1154,43 @@ with st.popover("⚙️  Configurações"):
         st.divider()
         st.markdown("**📅 Período de Fechamento**")
         st.caption("Define o período visível pelos vendedores na aba Minha Produção.")
-        _pf_ini_atual, _pf_fim_atual = load_periodo_fechamento(az_client_id, excel_url)
-        _pf_col1, _pf_col2 = st.columns(2)
-        with _pf_col1:
-            _pf_ini = st.date_input(
-                "Início", value=_pf_ini_atual or date.today().replace(day=1),
-                key="cfg_pf_ini", format="DD/MM/YYYY",
+        if not st.session_state.get("_pf_autenticado"):
+            _pf_senha = st.text_input(
+                "Senha para editar período",
+                type="password",
+                key="input_senha_pf",
+                placeholder="Digite a senha...",
             )
-        with _pf_col2:
-            _pf_fim = st.date_input(
-                "Fim", value=_pf_fim_atual or date.today(),
-                key="cfg_pf_fim", format="DD/MM/YYYY",
-            )
-        if st.button("💾 Salvar período", key="cfg_salvar_periodo", use_container_width=True):
-            _err_pf = save_periodo_fechamento(az_client_id, excel_url, _pf_ini, _pf_fim)
-            if _err_pf:
-                st.error(_err_pf)
-            else:
-                st.success("✅ Período salvo!")
+            if st.button("🔓 Desbloquear", key="btn_senha_pf", use_container_width=True):
+                try:
+                    _pf_senha_correta = st.secrets["SENHA_COMISSAO"]
+                except Exception:
+                    _pf_senha_correta = None
+                if _pf_senha_correta and _pf_senha == _pf_senha_correta:
+                    st.session_state["_pf_autenticado"] = True
+                    st.rerun()
+                else:
+                    st.error("❌ Senha incorreta.")
+        else:
+            _pf_ini_atual, _pf_fim_atual = load_periodo_fechamento(az_client_id, excel_url)
+            _pf_col1, _pf_col2 = st.columns(2)
+            with _pf_col1:
+                _pf_ini = st.date_input(
+                    "Início", value=_pf_ini_atual or date.today().replace(day=1),
+                    key="cfg_pf_ini", format="DD/MM/YYYY",
+                )
+            with _pf_col2:
+                _pf_fim = st.date_input(
+                    "Fim", value=_pf_fim_atual or date.today(),
+                    key="cfg_pf_fim", format="DD/MM/YYYY",
+                )
+            if st.button("💾 Salvar período", key="cfg_salvar_periodo", use_container_width=True):
+                _err_pf = save_periodo_fechamento(az_client_id, excel_url, _pf_ini, _pf_fim)
+                if _err_pf:
+                    st.error(_err_pf)
+                else:
+                    st.success("✅ Período salvo!")
+                    st.session_state.pop("_pf_autenticado", None)
 
 _tab_c, _tab_com, _tab_graf, _tab_vend = st.tabs([
     "📋  Contratos Banco VW", "💰  Comissão", "📈  Gráficos", "👤  Minha Produção",
