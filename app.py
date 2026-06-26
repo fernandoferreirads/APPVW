@@ -1721,7 +1721,37 @@ with _tab_c:
                         st.error(f"❌ Erro ao inserir: {e}")
 
 with _tab_com:
-    _render_comm(az_client_id, excel_url)
+    if not st.session_state.get("_comm_autenticado"):
+        st.markdown(
+            "<p style='font-size:1.1rem;font-weight:700;color:#001e50;"
+            "margin-bottom:1rem'>🔒 Área Restrita — Comissão</p>",
+            unsafe_allow_html=True,
+        )
+        with st.container(border=True):
+            _senha_digitada = st.text_input(
+                "Senha de acesso",
+                type="password",
+                key="input_senha_comm",
+                placeholder="Digite a senha...",
+            )
+            if st.button("🔓 Entrar", key="btn_senha_comm", use_container_width=True):
+                try:
+                    _senha_correta = st.secrets["SENHA_COMISSAO"]
+                except Exception:
+                    st.error("⚠️ Senha não configurada. Adicione SENHA_COMISSAO nos Secrets do Streamlit.")
+                    _senha_correta = None
+                if _senha_correta and _senha_digitada == _senha_correta:
+                    st.session_state["_comm_autenticado"] = True
+                    st.rerun()
+                elif _senha_correta:
+                    st.error("❌ Senha incorreta.")
+    else:
+        _col_comm, _col_lock = st.columns([10, 1])
+        with _col_lock:
+            if st.button("🔒", key="btn_travar_comm", help="Travar acesso à Comissão"):
+                st.session_state.pop("_comm_autenticado", None)
+                st.rerun()
+        _render_comm(az_client_id, excel_url)
 
 with _tab_graf:
     from graficos import render_graficos as _render_graf
