@@ -167,6 +167,7 @@ def _build_bigbase_df(values: list[list]) -> pd.DataFrame:
 
 _BIGBASE_TAB        = "BASE_PAGAMENTOS"
 _ABA_OUTROS_BANCOS  = "OUTROS_BANCOS"
+_ABA_CONFIGURACAO   = "CONFIGURACAO"
 _SPF_FINANCEIRAS_OB = {"BRADESCO", "ITAU", "ITAÚ", "SAFRA", "SANTANDER"}
 _CACHE_TTL          = 300   # segundos (5 min)
 
@@ -1558,3 +1559,211 @@ def render_comissao(client_id: str = "", sharing_url: str = "") -> None:
             use_container_width=True,
             key="comm_export",
         )
+
+
+# ─── Período de Fechamento (aba CONFIGURACAO) ─────────────────────────────────
+
+def load_periodo_fechamento(
+    client_id: str, sharing_url: str
+) -> tuple[date | None, date | None]:
+    """Lê data_ini e data_fim da aba CONFIGURACAO. Retorna (None, None) se não configurado."""
+    cache_key = "_comm_periodo_fechamento"
+    ts_key    = "_comm_ts_periodo"
+    cached    = st.session_state.get(cache_key)
+    cached_ts = st.session_state.get(ts_key, 0)
+    if cached is not None and time.time() - cached_ts < _CACHE_TTL:
+        return cached
+
+    st.session_state["_comm_client_id"] = client_id
+    try:
+        token             = _ms_token()
+        drive_id, item_id = _resolve_file(token, sharing_url)
+        ws_id             = _find_ws_id(token, drive_id, item_id, _ABA_CONFIGURACAO)
+        values            = _read_range(token, drive_id, item_id, ws_id)
+
+        data_map: dict[str, str] = {}
+        for row in values:
+            if len(row) >= 2 and row[0] and row[1]:
+                data_map[str(row[0]).lower().strip()] = str(row[1]).strip()
+
+        ini_str = data_map.get("periodo_ini")
+        fim_str = data_map.get("periodo_fim")
+
+        ini = date.fromisoformat(ini_str) if ini_str else None
+        fim = date.fromisoformat(fim_str) if fim_str else None
+
+        result = (ini, fim)
+        st.session_state[cache_key] = result
+        st.session_state[ts_key]    = time.time()
+        return result
+    except Exception:
+        return None, None
+
+
+def save_periodo_fechamento(
+    client_id: str, sharing_url: str, data_ini: date, data_fim: date
+) -> str:
+    """Grava data_ini e data_fim na aba CONFIGURACAO da planilha. Retorna '' em sucesso."""
+    st.session_state["_comm_client_id"] = client_id
+    try:
+        token             = _ms_token()
+        drive_id, item_id = _resolve_file(token, sharing_url)
+
+        try:
+            ws_id = _find_ws_id(token, drive_id, item_id, _ABA_CONFIGURACAO)
+        except Exception:
+            r = requests.post(
+                f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}"
+                f"/workbook/worksheets",
+                headers={"Authorization": f"Bearer {token}",
+                         "Content-Type": "application/json"},
+                json={"name": _ABA_CONFIGURACAO},
+                timeout=20,
+            )
+            r.raise_for_status()
+            ws_id = r.json()["id"]
+            st.session_state.pop(f"_comm_ws_{item_id}_{_ABA_CONFIGURACAO}", None)
+
+        valores = [
+            ["chave",        "valor"],
+            ["periodo_ini",  data_ini.isoformat()],
+            ["periodo_fim",  data_fim.isoformat()],
+        ]
+        r = requests.patch(
+            f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}"
+            f"/workbook/worksheets/{_url_quote(ws_id)}/range(address='A1:B3')",
+            headers={"Authorization": f"Bearer {token}",
+                     "Content-Type": "application/json"},
+            json={"values": valores},
+            timeout=20,
+        )
+        r.raise_for_status()
+
+        st.session_state.pop("_comm_periodo_fechamento", None)
+        st.session_state.pop("_comm_ts_periodo", None)
+        return ""
+    except Exception as exc:
+        return f"❌ {exc}"
+
+
+# ─── Painel Individual do Vendedor ────────────────────────────────────────────
+
+def render_painel_vendedor(client_id: str = "", sharing_url: str = "") -> None:
+    """Aba 'Minha Produção' — login por matrícula + visão individual de comissão."""
+
+    if not client_id or not sharing_url:
+        st.info("⚙️ Configure o Client ID e o link do Excel nas Configurações.")
+        return
+
+    vend_logado: str | None = st.session_state.get("_vend_logado")
+
+    # ── Tela de login ─────────────────────────────────────────────────────────
+    if not vend_logado:
+        st.markdown(
+            "<p style='font-size:1.1rem;font-weight:700;color:#001e50;"
+            "margin-bottom:1rem'>👤 Acesso ao Painel do Vendedor</p>",
+            unsafe_allow_html=True,
+        )
+        with st.container(border=True):
+            vendedores_lista = sorted(_VENDEDOR_MATRICULA.keys())
+            nome_sel = st.selectbox(
+                "Seu nome",
+                options=[""] + vendedores_lista,
+                format_func=lambda x: "Selecione seu nome..." if x == "" else x,
+                key="vend_nome_login",
+            )
+            pin_input = st.number_input(
+                "Matrícula",
+                min_value=0, max_value=999999,
+                value=0, step=1,
+                key="vend_pin_login",
+            )
+            if st.button("🔓 Entrar", use_container_width=True, key="vend_btn_login"):
+                if not nome_sel:
+                    st.error("Selecione seu nome.")
+                else:
+                    mat = _VENDEDOR_MATRICULA.get(nome_sel)
+                    if mat is None:
+                        st.warning("⚠️ Matrícula não cadastrada ainda. Procure o gestor.")
+                    elif int(pin_input) == int(mat):
+                        st.session_state["_vend_logado"] = nome_sel
+                        st.rerun()
+                    else:
+                        st.error("❌ Matrícula incorreta. Tente novamente.")
+        return
+
+    # ── Painel logado ─────────────────────────────────────────────────────────
+    col_h, col_sair = st.columns([7, 1])
+    col_h.markdown(
+        f"<p style='font-size:1rem;font-weight:700;color:#001e50;margin:0'>"
+        f"👤 {vend_logado}</p>",
+        unsafe_allow_html=True,
+    )
+    if col_sair.button("🚪 Sair", key="vend_btn_sair", use_container_width=True):
+        st.session_state.pop("_vend_logado", None)
+        st.rerun()
+
+    # Carrega período de fechamento
+    data_ini, data_fim = load_periodo_fechamento(client_id, sharing_url)
+    if data_ini is None or data_fim is None:
+        st.warning(
+            "⚠️ Período de fechamento ainda não configurado. "
+            "Aguarde o gestor definir o período nas Configurações."
+        )
+        return
+
+    st.info(
+        f"📅 Período de fechamento: "
+        f"**{data_ini.strftime('%d/%m/%Y')} → {data_fim.strftime('%d/%m/%Y')}**"
+    )
+
+    # Carrega dados da base
+    st.session_state["_comm_client_id"] = client_id
+    df_base, err = load_bigbase(client_id, sharing_url)
+    if err:
+        st.error(err)
+        return
+    if df_base is None or df_base.empty:
+        st.warning("⚠️ Base de dados vazia ou inacessível.")
+        return
+
+    # Filtra e calcula comissão
+    df_filtrado = filter_records(df_base, vend_logado, data_ini, data_fim)
+    summary     = calc_commission(df_filtrado)
+
+    df_ob, _ = load_outros_bancos(client_id, sharing_url)
+    ob_result = calc_commission_outros_bancos(
+        df_ob if df_ob is not None else pd.DataFrame(),
+        vend_logado, data_ini, data_fim,
+    )
+
+    summary["vendedor"]              = vend_logado
+    summary["data_ini"]              = data_ini
+    summary["data_fim"]              = data_fim
+    summary["ob_spf_commission"]     = ob_result["spf_commission"]
+    summary["ob_retorno_commission"] = ob_result["retorno_commission"]
+    summary["ob_total_contratos"]    = ob_result["total_contratos"]
+    summary["df_ob_filtrado"]        = ob_result.get("df_filtrado", pd.DataFrame())
+    summary["df_filtrado"]           = df_filtrado
+
+    _render_kpis(summary)
+
+    sub_det, sub_con, sub_ob = st.tabs([
+        "📋 Detalhamento por Produto",
+        "📄 Contratos do Período",
+        "🏦 Outros Bancos",
+    ])
+
+    with sub_det:
+        _render_table(summary)
+
+    with sub_con:
+        _render_contratos(df_filtrado)
+
+    with sub_ob:
+        df_ob_filtrado = summary.get("df_ob_filtrado", pd.DataFrame())
+        n_ob = ob_result["total_contratos"]
+        if n_ob == 0:
+            st.info("Nenhum contrato de Outros Bancos no período selecionado.")
+        else:
+            _render_contratos_ob(df_ob_filtrado)

@@ -1144,8 +1144,33 @@ with st.popover("⚙️  Configurações"):
     if not excel_ok and _auth_st not in ("pending", "checking", "authenticated"):
         st.caption("💡 Preencha o Client ID, o link do Excel e faça login para inserir dados.")
 
-_tab_c, _tab_com, _tab_graf = st.tabs([
-    "📋  Contratos", "💰  Comissão", "📈  Gráficos",
+    if excel_ok:
+        st.divider()
+        st.markdown("**📅 Período de Fechamento**")
+        st.caption("Define o período visível pelos vendedores na aba Minha Produção.")
+        from comissao import load_periodo_fechamento as _lpf, save_periodo_fechamento as _spf
+        _pf_ini_atual, _pf_fim_atual = _lpf(az_client_id, excel_url)
+        from datetime import date as _date
+        _pf_col1, _pf_col2 = st.columns(2)
+        with _pf_col1:
+            _pf_ini = st.date_input(
+                "Início", value=_pf_ini_atual or _date.today().replace(day=1),
+                key="cfg_pf_ini", format="DD/MM/YYYY",
+            )
+        with _pf_col2:
+            _pf_fim = st.date_input(
+                "Fim", value=_pf_fim_atual or _date.today(),
+                key="cfg_pf_fim", format="DD/MM/YYYY",
+            )
+        if st.button("💾 Salvar período", key="cfg_salvar_periodo", use_container_width=True):
+            _err_pf = _spf(az_client_id, excel_url, _pf_ini, _pf_fim)
+            if _err_pf:
+                st.error(_err_pf)
+            else:
+                st.success("✅ Período salvo!")
+
+_tab_c, _tab_com, _tab_graf, _tab_vend = st.tabs([
+    "📋  Contratos Banco VW", "💰  Comissão", "📈  Gráficos", "👤  Minha Produção",
 ])
 
 with _tab_c:
@@ -1698,3 +1723,7 @@ with _tab_com:
 with _tab_graf:
     from graficos import render_graficos as _render_graf
     _render_graf(az_client_id, excel_url)
+
+with _tab_vend:
+    from comissao import render_painel_vendedor as _render_vend
+    _render_vend(az_client_id, excel_url)
