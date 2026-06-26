@@ -8,7 +8,7 @@ import base64
 import hashlib
 import threading
 import time as _time
-from datetime import datetime
+from datetime import datetime, date
 from difflib import get_close_matches
 
 import pandas as pd
@@ -18,6 +18,12 @@ import msal
 import requests
 from urllib.parse import quote as _url_quote
 from dotenv import load_dotenv
+from comissao import (
+    render_comissao as _render_comm,
+    load_periodo_fechamento,
+    save_periodo_fechamento,
+    render_painel_vendedor as _render_vend,
+)
 
 load_dotenv()
 
@@ -1148,22 +1154,20 @@ with st.popover("⚙️  Configurações"):
         st.divider()
         st.markdown("**📅 Período de Fechamento**")
         st.caption("Define o período visível pelos vendedores na aba Minha Produção.")
-        from comissao import load_periodo_fechamento as _lpf, save_periodo_fechamento as _spf
-        _pf_ini_atual, _pf_fim_atual = _lpf(az_client_id, excel_url)
-        from datetime import date as _date
+        _pf_ini_atual, _pf_fim_atual = load_periodo_fechamento(az_client_id, excel_url)
         _pf_col1, _pf_col2 = st.columns(2)
         with _pf_col1:
             _pf_ini = st.date_input(
-                "Início", value=_pf_ini_atual or _date.today().replace(day=1),
+                "Início", value=_pf_ini_atual or date.today().replace(day=1),
                 key="cfg_pf_ini", format="DD/MM/YYYY",
             )
         with _pf_col2:
             _pf_fim = st.date_input(
-                "Fim", value=_pf_fim_atual or _date.today(),
+                "Fim", value=_pf_fim_atual or date.today(),
                 key="cfg_pf_fim", format="DD/MM/YYYY",
             )
         if st.button("💾 Salvar período", key="cfg_salvar_periodo", use_container_width=True):
-            _err_pf = _spf(az_client_id, excel_url, _pf_ini, _pf_fim)
+            _err_pf = save_periodo_fechamento(az_client_id, excel_url, _pf_ini, _pf_fim)
             if _err_pf:
                 st.error(_err_pf)
             else:
@@ -1717,7 +1721,6 @@ with _tab_c:
                         st.error(f"❌ Erro ao inserir: {e}")
 
 with _tab_com:
-    from comissao import render_comissao as _render_comm
     _render_comm(az_client_id, excel_url)
 
 with _tab_graf:
@@ -1725,5 +1728,4 @@ with _tab_graf:
     _render_graf(az_client_id, excel_url)
 
 with _tab_vend:
-    from comissao import render_painel_vendedor as _render_vend
     _render_vend(az_client_id, excel_url)
