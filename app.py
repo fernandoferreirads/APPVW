@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import streamlit as st
 import json
@@ -27,16 +27,16 @@ from comissao import (
 
 load_dotenv()
 
-# â”€â”€â”€ Mapeamentos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── Mapeamentos ───────────────────────────────────────────────────────────────
 
 MESES_PT = {
-    1: "JANEIRO", 2: "FEVEREIRO", 3: "MARÃ‡O", 4: "ABRIL",
+    1: "JANEIRO", 2: "FEVEREIRO", 3: "MARÇO", 4: "ABRIL",
     5: "MAIO", 6: "JUNHO", 7: "JULHO", 8: "AGOSTO",
     9: "SETEMBRO", 10: "OUTUBRO", 11: "NOVEMBRO", 12: "DEZEMBRO",
 }
 
 VENDEDOR_EQUIPE = {
-    # â”€â”€ VW SIA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── VW SIA ────────────────────────────────────────────────────────────────
     "ALBERT ALVES TORRES":                    "VW SIA",
     "CATARINA GUEDES FERNANDES":              "VW SIA",
     "CLAUDIO HENRIQUE RODRIGUES CABRAL":      "VW SIA",
@@ -54,14 +54,14 @@ VENDEDOR_EQUIPE = {
     "RODRIGO HERCULANO TORRES SANTANA":       "VW SIA",
     "SABRINA ALMEIDA VIANA":                  "VW SIA",
     "YNGRID KAREN BATISTA DE FREITAS":        "VW SIA",
-    # â”€â”€ NP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── NP ────────────────────────────────────────────────────────────────────
     "AMAURI RODRIGUES DOS SANTOS":            "NP",
     "DANILO DA ROCHA NEVES":                  "NP",
     "FLAVIO PEREIRA DE SOUZA":                "NP",
     "JAME WILLIAMS DA SILVA COSTA":           "NP",
     "RODRIGO DA SILVA PAZ":                   "NP",
     "THIAGO TORRES DA SILVA GOUVES":          "NP",
-    # â”€â”€ SN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── SN ────────────────────────────────────────────────────────────────────
     "ANTONINO VITORINO DE SOUSA":             "SN",
     "DOUGLAS OLIVEIRA DE MORAIS":             "SN",
     "EDUARDO ALVES ROQUE":                    "SN",
@@ -77,7 +77,7 @@ FINANCEIRAS = [
     "BV",
     "C6",
     "Ford",
-    "Ãtau",
+    "Ítau",
     "PAN",
     "Safra",
     "Santander",
@@ -99,8 +99,8 @@ PONTOS_PRODUTO = {
     "PROTEGE PLUS 36": 0.60,
 }
 
-# â”€â”€â”€ Produtos Avulsos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# Categorias e opÃ§Ãµes exibidas no formulÃ¡rio de Cadastro Avulso
+# ─── Produtos Avulsos ──────────────────────────────────────────────────────────
+# Categorias e opções exibidas no formulário de Cadastro Avulso
 PRODUTOS_AVULSO = {
     "Garantia":   ["GE 1", "GE 2", "GE 3", "GE 4"],
     "Seguro":     ["Seguro VW", "Seguro Corretora"],
@@ -121,65 +121,65 @@ PONTOS_AVULSO = {
     "Prot Plus 36":     0.60,
 }
 
-EXTRACTION_PROMPT = """VocÃª Ã© um sistema de extraÃ§Ã£o de dados de contratos CCB do Banco Volkswagen.
-Extraia os campos abaixo do PDF e retorne APENAS um objeto JSON vÃ¡lido â€” sem markdown, sem explicaÃ§Ã£o.
+EXTRACTION_PROMPT = """Você é um sistema de extração de dados de contratos CCB do Banco Volkswagen.
+Extraia os campos abaixo do PDF e retorne APENAS um objeto JSON válido — sem markdown, sem explicação.
 
-REGRAS DE EXTRAÃ‡ÃƒO:
+REGRAS DE EXTRAÇÃO:
 
-1. proposta: nÃºmero de 8 dÃ­gitos da proposta (Ã¡rea do cÃ³digo de barras, canto inferior esquerdo da pÃ¡gina 1).
-   Exemplo: "14469703". NÃƒO inclua sufixos como "V.002".
+1. proposta: número de 8 dígitos da proposta (área do código de barras, canto inferior esquerdo da página 1).
+   Exemplo: "14469703". NÃO inclua sufixos como "V.002".
 
-2. vendedor: nome IMPRESSO (nÃ£o assinatura) abaixo de "ASSINATURA DO RESPONSÃVEL PELA ABERTURA DO CADASTRO"
-   na pÃ¡gina "FICHA CADASTRAL - PESSOA FÃSICA". Retorne em MAIÃšSCULAS.
+2. vendedor: nome IMPRESSO (não assinatura) abaixo de "ASSINATURA DO RESPONSÁVEL PELA ABERTURA DO CADASTRO"
+   na página "FICHA CADASTRAL - PESSOA FÍSICA". Retorne em MAIÚSCULAS.
 
-3. cpf_cnpj: em "I- EMITENTE", campo CPF/CNPJ (lado direito), com pontuaÃ§Ã£o original (pontos, traÃ§os, barras).
-   ATENÃ‡ÃƒO: copie o nÃºmero COMPLETO incluindo todos os dÃ­gitos. CPF tem 11 dÃ­gitos (ex: 830.606.501-87).
+3. cpf_cnpj: em "I- EMITENTE", campo CPF/CNPJ (lado direito), com pontuação original (pontos, traços, barras).
+   ATENÇÃO: copie o número COMPLETO incluindo todos os dígitos. CPF tem 11 dígitos (ex: 830.606.501-87).
 
-4. cliente: em "I- EMITENTE", campo "Nome / RazÃ£o Social". Nome completo.
+4. cliente: em "I- EMITENTE", campo "Nome / Razão Social". Nome completo.
 
-5. valor_veiculo: em "QUADRO 5 â€“ ESPECIFICAÃ‡Ã•ES GERAIS DO CRÃ‰DITO CONSOLIDADAS",
-   campo "Valor do VeÃ­culo". Retorne como nÃºmero float (ex: 117000.00). Sem sÃ­mbolo de moeda.
+5. valor_veiculo: em "QUADRO 5 – ESPECIFICAÇÕES GERAIS DO CRÉDITO CONSOLIDADAS",
+   campo "Valor do Veículo". Retorne como número float (ex: 117000.00). Sem símbolo de moeda.
 
 6. entrada: em "QUADRO 5", campo "Valor da Entrada". Retorne como float.
 
-7. spf: em "QUADRO 4", linha "Seguro de ProteÃ§Ã£o Financeira":
-   - NÃ£o contratado â†’ null
-   - Contratado â†’ localize a pÃ¡gina com tÃ­tulo "SEGURO DE PROTEÃ‡ÃƒO FINANCEIRA + PERDA DE RENDA ___".
-     A palavra que preenche o espaÃ§o apÃ³s "RENDA" indica o tipo: PLUS, NORMAL ou BÃSICO/BASICO.
-   - Retorne exatamente: "SPF PLUS", "SPF NORMAL" ou "SPF BASICO". Null se nÃ£o contratado.
+7. spf: em "QUADRO 4", linha "Seguro de Proteção Financeira":
+   - Não contratado → null
+   - Contratado → localize a página com título "SEGURO DE PROTEÇÃO FINANCEIRA + PERDA DE RENDA ___".
+     A palavra que preenche o espaço após "RENDA" indica o tipo: PLUS, NORMAL ou BÁSICO/BASICO.
+   - Retorne exatamente: "SPF PLUS", "SPF NORMAL" ou "SPF BASICO". Null se não contratado.
 
-8. ap: "Acidentes Pessoais" no QUADRO 4 â€” contratado â†’ "AP", senÃ£o null.
+8. ap: "Acidentes Pessoais" no QUADRO 4 — contratado → "AP", senão null.
 
-9. gap: "GAP" no QUADRO 4 â€” contratado â†’ "GAP", senÃ£o null.
+9. gap: "GAP" no QUADRO 4 — contratado → "GAP", senão null.
 
-10. franquia: "Seguro Franquia" no QUADRO 4 â€” contratado â†’ "FRANQUIA", senÃ£o null.
+10. franquia: "Seguro Franquia" no QUADRO 4 — contratado → "FRANQUIA", senão null.
 
-11. ge: "Garantia Estendida / Garantia MecÃ¢nica" no QUADRO 4:
-    - NÃ£o contratado â†’ null
-    - Contratado: verifique o Valor do PrÃªmio daquela linha:
-      * valor < 1100 â†’ "GE 1"
-      * 1100 â‰¤ valor â‰¤ 2000 â†’ "GE 2"
-      * valor > 2000 â†’ "GE 4"
-    IMPORTANTE: "GE 3" NÃƒO EXISTE. Nunca retorne "GE 3".
+11. ge: "Garantia Estendida / Garantia Mecânica" no QUADRO 4:
+    - Não contratado → null
+    - Contratado: verifique o Valor do Prêmio daquela linha:
+      * valor < 1100 → "GE 1"
+      * 1100 ≤ valor ≤ 2000 → "GE 2"
+      * valor > 2000 → "GE 4"
+    IMPORTANTE: "GE 3" NÃO EXISTE. Nunca retorne "GE 3".
 
-12. protege: no QUADRO 3 (ACESSÃ“RIOS/PEÃ‡AS/SERVIÃ‡OS), produto PROTEGE/proteÃ§Ã£o veicular:
-    - NÃ£o contratado â†’ null
+12. protege: no QUADRO 3 (ACESSÓRIOS/PEÇAS/SERVIÇOS), produto PROTEGE/proteção veicular:
+    - Não contratado → null
     - Contratado, verifique o valor:
-      699 â†’ "PROTEGE BAS 24" | 999 â†’ "PROTEGE BAS 36"
-      1399 â†’ "PROTEGE PLUS 24" | 1699 â†’ "PROTEGE PLUS 36"
+      699 → "PROTEGE BAS 24" | 999 → "PROTEGE BAS 36"
+      1399 → "PROTEGE PLUS 24" | 1699 → "PROTEGE PLUS 36"
 
-13. prazo: em "QUADRO 5", "Prazo da CÃ‰DULA" em Meses. Retorne como inteiro.
+13. prazo: em "QUADRO 5", "Prazo da CÉDULA" em Meses. Retorne como inteiro.
 
-14. taxa: em "QUADRO 1 - VEÃCULO FINANCIADO", "Taxa de juros ao mÃªs prefixados e capitalizados".
+14. taxa: em "QUADRO 1 - VEÍCULO FINANCIADO", "Taxa de juros ao mês prefixados e capitalizados".
     Retorne como float com ponto decimal (ex: 0.99 para 0,99%).
 
-15. n_s: em "QUADRO 1", qual opÃ§Ã£o estÃ¡ marcada:
-    Novo(N) â†’ "N" | Semi-Novo(SN) â†’ "S" | Usado(U) â†’ "U"
+15. n_s: em "QUADRO 1", qual opção está marcada:
+    Novo(N) → "N" | Semi-Novo(SN) → "S" | Usado(U) → "U"
 
-16. sempre_novo: em "QUADRO 7 â€“ FLUXO DE PRESTAÃ‡Ã•ES PERIÃ“DICAS E INTERMEDIÃRIAS":
+16. sempre_novo: em "QUADRO 7 – FLUXO DE PRESTAÇÕES PERIÓDICAS E INTERMEDIÁRIAS":
     Analise os valores de todas as parcelas.
-    Se a Ãºltima parcela (de nÃºmero mais alto) tiver valor significativamente maior que as demais â†’ "SMP NV"
-    Se todas as parcelas forem iguais ou aproximadamente iguais â†’ null
+    Se a última parcela (de número mais alto) tiver valor significativamente maior que as demais → "SMP NV"
+    Se todas as parcelas forem iguais ou aproximadamente iguais → null
 
 Retorne APENAS este JSON:
 {
@@ -202,7 +202,7 @@ Retorne APENAS este JSON:
 }"""
 
 
-# â”€â”€â”€ Regras de NegÃ³cio â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── Regras de Negócio ─────────────────────────────────────────────────────────
 
 def lookup_vendedor(nome: str) -> str:
     nome_up = nome.upper().strip()
@@ -214,7 +214,7 @@ def lookup_vendedor(nome: str) -> str:
     for chave, valor in VENDEDOR_EQUIPE.items():
         if chave in nome_up or nome_up in chave:
             return valor
-    return "NÃƒO IDENTIFICADO"
+    return "NÃO IDENTIFICADO"
 
 
 def calcular_peso(tipo: str, taxa: float) -> float:
@@ -318,9 +318,9 @@ def calcular_retorno_outro_banco(valor_financiado: float, tipo_retorno: str) -> 
 
 
 def para_linha_outros_bancos(item: dict) -> list:
-    """Gera a linha para a aba OUTROS_BANCOS (colunas Aâ€“L, 12 colunas)."""
+    """Gera a linha para a aba OUTROS_BANCOS (colunas A–L, 12 colunas)."""
     return [
-        item["mes"],              # A - MÃŠS
+        item["mes"],              # A - MÊS
         item["data_pagamento"],   # B - DATA PAGAMENTO
         item["financeira"],       # C - FINANCEIRA
         item["equipe"],           # D - EQUIPE
@@ -343,7 +343,7 @@ def produto_para_linha_avulso(item: dict) -> list:
         "Prot Plus 24": "PROTEGE PLUS 24",
         "Prot Plus 36": "PROTEGE PLUS 36",
     }
-    row = [""] * 23             # colunas Aâ€“W (23 colunas)
+    row = [""] * 23             # colunas A–W (23 colunas)
     row[1]  = item["equipe"]    # B  - EQUIPE
     row[2]  = item["data"]      # C  - DATA PAGAMENTO
     row[3]  = item["cpf"]       # D  - CPF/CNPJ
@@ -364,16 +364,16 @@ def produto_para_linha_avulso(item: dict) -> list:
     return row
 
 
-# â”€â”€â”€ ExtraÃ§Ã£o via Gemini API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── Extração via Gemini API ───────────────────────────────────────────────────
 
 def _filtrar_paginas(pdf_bytes: bytes) -> bytes:
-    """Remove pÃ¡ginas 3-8 (boilerplate de diretrizes) antes de enviar ao Gemini."""
+    """Remove páginas 3-8 (boilerplate de diretrizes) antes de enviar ao Gemini."""
     from pypdf import PdfReader, PdfWriter
     import io
     reader = PdfReader(io.BytesIO(pdf_bytes))
     writer = PdfWriter()
     for i, page in enumerate(reader.pages):
-        if i < 2 or i > 7:   # mantÃ©m pÃ¡ginas 1-2 e 9 em diante
+        if i < 2 or i > 7:   # mantém páginas 1-2 e 9 em diante
             writer.add_page(page)
     buf = io.BytesIO()
     writer.write(buf)
@@ -397,7 +397,7 @@ def extrair_contrato(pdf_bytes: bytes, api_key: str) -> dict:
     return json.loads(texto)
 
 
-# â”€â”€â”€ Microsoft Graph API â€” Excel Online â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── Microsoft Graph API — Excel Online ───────────────────────────────────────
 
 CORES_CATEGORIA = {
     "Seguro":     "#00B050",
@@ -407,7 +407,7 @@ CORES_CATEGORIA = {
 
 _GRAPH_SCOPES = ["https://graph.microsoft.com/Files.ReadWrite"]
 
-# â”€â”€ Token persistence (mantÃ©m login entre sessÃµes) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Token persistence (mantém login entre sessões) ────────────────────────────
 _TOKEN_CACHE_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "credentials", "ms_token.json"
 )
@@ -415,7 +415,7 @@ _TOKEN_CACHE_PATH = os.path.join(
 
 def _save_token_cache(access_token: str, token_exp: float,
                       refresh_token: str, email: str = "") -> None:
-    """Persiste tokens no disco para restaurar sessÃ£o sem novo login."""
+    """Persiste tokens no disco para restaurar sessão sem novo login."""
     try:
         os.makedirs(os.path.dirname(_TOKEN_CACHE_PATH), exist_ok=True)
         with open(_TOKEN_CACHE_PATH, "w", encoding="utf-8") as _f:
@@ -426,11 +426,11 @@ def _save_token_cache(access_token: str, token_exp: float,
                 "email":         email,
             }, _f)
     except Exception:
-        pass  # falha silenciosa â€” nÃ£o bloqueia o app
+        pass  # falha silenciosa — não bloqueia o app
 
 
 def _load_token_cache() -> dict | None:
-    """Carrega tokens do disco (retorna None se nÃ£o existir ou invÃ¡lido)."""
+    """Carrega tokens do disco (retorna None se não existir ou inválido)."""
     try:
         with open(_TOKEN_CACHE_PATH, "r", encoding="utf-8") as _f:
             return json.load(_f)
@@ -446,10 +446,10 @@ def _clear_token_cache() -> None:
         pass
 
 
-# â”€â”€ Auth helpers (HTTP direto â€” resiliente a session reset) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Auth helpers (HTTP direto — resiliente a session reset) ───────────────────
 
 def _poll_once(device_code: str, client_id: str) -> dict:
-    """Uma Ãºnica chamada ao endpoint de token â€” sem bloquear nem usar thread."""
+    """Uma única chamada ao endpoint de token — sem bloquear nem usar thread."""
     r = requests.post(
         "https://login.microsoftonline.com/common/oauth2/v2.0/token",
         data={
@@ -463,7 +463,7 @@ def _poll_once(device_code: str, client_id: str) -> dict:
 
 
 def _get_valid_token(client_id: str) -> str:
-    """Retorna access token vÃ¡lido; renova via refresh_token se necessÃ¡rio."""
+    """Retorna access token válido; renova via refresh_token se necessário."""
     token = st.session_state.get("_ms_token")
     exp   = st.session_state.get("_ms_token_exp", 0)
     if token and _time.time() < exp - 60:
@@ -490,10 +490,10 @@ def _get_valid_token(client_id: str) -> str:
             _save_token_cache(d["access_token"], _new_exp, _new_refresh,
                               st.session_state.get("_msal_user_email", ""))
             return d["access_token"]
-    raise Exception("NÃ£o autenticado. Clique em 'ðŸ”‘ Conectar Microsoft' nas ConfiguraÃ§Ãµes.")
+    raise Exception("Não autenticado. Clique em '🔑 Conectar Microsoft' nas Configurações.")
 
 
-# â”€â”€ Graph API helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Graph API helpers ─────────────────────────────────────────────────────────
 
 def _resolve_excel_ids(token: str, sharing_url: str) -> tuple:
     encoded = base64.urlsafe_b64encode(sharing_url.encode()).decode().rstrip("=")
@@ -518,7 +518,7 @@ def _get_ws_id(token: str, drive_id: str, item_id: str, sheet_name: str) -> str:
     for ws in r.json().get("value", []):
         if ws["name"] == sheet_name:
             return ws["id"]
-    raise Exception(f"Aba '{sheet_name}' nÃ£o encontrada no arquivo Excel.")
+    raise Exception(f"Aba '{sheet_name}' não encontrada no arquivo Excel.")
 
 
 def _url_hash(url: str) -> str:
@@ -527,7 +527,7 @@ def _url_hash(url: str) -> str:
 
 
 def _get_excel_ids(token: str, sharing_url: str, aba: str) -> tuple:
-    """Retorna (drive_id, item_id, base_url) â€” IDs cacheados no session_state (por URL + aba)."""
+    """Retorna (drive_id, item_id, base_url) — IDs cacheados no session_state (por URL + aba)."""
     cache_key = f"_xl_ids_{_url_hash(sharing_url)}_{aba}"
     cached    = st.session_state.get(cache_key)
     if cached:
@@ -543,12 +543,12 @@ def _get_excel_ids(token: str, sharing_url: str, aba: str) -> tuple:
     return drive_id, item_id, base
 
 
-# â”€â”€ Excel Sessions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# Sem sessÃ£o: cada chamada Ã  API abre + fecha a workbook (~10-15 s por chamada).
-# Com sessÃ£o: workbook fica carregada em memÃ³ria; chamadas subsequentes <1 s.
+# ── Excel Sessions ────────────────────────────────────────────────────────────
+# Sem sessão: cada chamada à API abre + fecha a workbook (~10-15 s por chamada).
+# Com sessão: workbook fica carregada em memória; chamadas subsequentes <1 s.
 
 def _get_or_create_session(token: str, drive_id: str, item_id: str) -> str:
-    """Retorna ID de sessÃ£o Excel ativa (cria se nÃ£o houver)."""
+    """Retorna ID de sessão Excel ativa (cria se não houver)."""
     cache_key  = f"_xl_sess_{item_id}"
     session_id = st.session_state.get(cache_key, "")
     if session_id:
@@ -577,11 +577,11 @@ def _excel_hdrs(token: str, session_id: str = "") -> dict:
     return h
 
 
-# â”€â”€ Row detection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Row detection ─────────────────────────────────────────────────────────────
 
 def _proxima_linha_excel(base_url: str, hdrs: dict) -> int:
-    """Retorna a 1Âª linha VAZIA verificando TODAS as colunas da aba.
-    LÃª apenas os metadados + as Ãºltimas 30 linhas â€” O(constante), independe do tamanho."""
+    """Retorna a 1ª linha VAZIA verificando TODAS as colunas da aba.
+    Lê apenas os metadados + as últimas 30 linhas — O(constante), independe do tamanho."""
     # Passo 1: metadados leves para saber onde o usedRange termina
     r1 = requests.get(
         f"{base_url}/usedRange?$select=rowIndex,rowCount,columnCount",
@@ -602,10 +602,10 @@ def _proxima_linha_excel(base_url: str, hdrs: dict) -> int:
     if row_count == 0:
         return max(row_index + 1, 2)
 
-    # Passo 2: lÃª apenas as Ãºltimas 30 linhas em todas as colunas
-    last_row   = row_index + row_count          # Ãºltima linha usada (base-1 Excel)
-    first_scan = max(last_row - 29, 1)          # no mÃ¡ximo 30 linhas, mÃ­nimo linha 1
-    col_letter = chr(64 + min(col_count, 26))   # ex: 23 cols â†’ "W"
+    # Passo 2: lê apenas as últimas 30 linhas em todas as colunas
+    last_row   = row_index + row_count          # última linha usada (base-1 Excel)
+    first_scan = max(last_row - 29, 1)          # no máximo 30 linhas, mínimo linha 1
+    col_letter = chr(64 + min(col_count, 26))   # ex: 23 cols → "W"
 
     r2 = requests.get(
         f"{base_url}/range(address='{chr(65)}{first_scan}:{col_letter}{last_row}')",
@@ -619,7 +619,7 @@ def _proxima_linha_excel(base_url: str, hdrs: dict) -> int:
     except Exception:
         return last_row + 1
 
-    # Varre de baixo para cima â€” primeira linha com qualquer cÃ©lula preenchida
+    # Varre de baixo para cima — primeira linha com qualquer célula preenchida
     for i in range(len(values) - 1, -1, -1):
         if any(cell not in ("", None, 0) for cell in values[i]):
             return first_scan + i + 1  # linha seguinte, base-1
@@ -627,7 +627,7 @@ def _proxima_linha_excel(base_url: str, hdrs: dict) -> int:
     return max(row_index + 1, 2)
 
 
-# â”€â”€ Helpers comuns de inserÃ§Ã£o â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Helpers comuns de inserção ────────────────────────────────────────────────
 
 def nome_aba_atual() -> str:
     now = datetime.now()
@@ -635,7 +635,7 @@ def nome_aba_atual() -> str:
 
 
 def _ultimos_meses(n: int = 6) -> list[str]:
-    """Retorna os Ãºltimos n meses no formato 'MES ANO', mais recente primeiro."""
+    """Retorna os últimos n meses no formato 'MES ANO', mais recente primeiro."""
     result = []
     month, year = datetime.now().month, datetime.now().year
     for _ in range(n):
@@ -655,8 +655,8 @@ def _fazer_insercao(
     item_id: str,
     colorir_map: dict | None = None,
 ) -> int:
-    """Executa a inserÃ§Ã£o e, opcionalmente, a coloraÃ§Ã£o em paralelo.
-    Em caso de erro de sessÃ£o expirada, invalida e repropaga."""
+    """Executa a inserção e, opcionalmente, a coloração em paralelo.
+    Em caso de erro de sessão expirada, invalida e repropaga."""
     linha_ini  = _proxima_linha_excel(base_url, hdrs)
     n          = len(linhas)
     n_cols     = len(linhas[0]) if linhas else 23
@@ -718,15 +718,15 @@ def inserir_e_colorir_excel(itens: list, client_id: str, sharing_url: str,
     return _fazer_insercao(base, hdrs, linhas, token, item_id, colorir_map)
 
 
-# â”€â”€â”€ Interface â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── Interface ─────────────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="Flow F&I â€” Financiamentos VW",
-    page_icon="ðŸš—",
+    page_title="Flow F&I — Financiamentos VW",
+    page_icon="🚗",
     layout="wide",
 )
 
-# â”€â”€ Assets â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Assets ───────────────────────────────────────────────────────────────────
 def _img_b64(path: str) -> str:
     try:
         with open(path, "rb") as f:
@@ -738,7 +738,7 @@ _assets_dir   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets
 _vw_b64       = _img_b64(os.path.join(_assets_dir, "vw_logo.png"))
 _brasal_b64   = _img_b64(os.path.join(_assets_dir, "brasal_logo.png"))
 
-# â”€â”€ Estilos VW Financial Services â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Estilos VW Financial Services ────────────────────────────────────────────
 st.markdown('<meta name="google" content="notranslate">', unsafe_allow_html=True)
 st.markdown("""
 <style>
@@ -748,9 +748,9 @@ st.markdown("""
 * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important; }
 
 /*
- * Restaura a fonte correta para os Ã­cones do Streamlit.
+ * Restaura a fonte correta para os ícones do Streamlit.
  * [data-testid="stIconMaterial"] tem especificidade 0-1-0 > universal 0-0-0,
- * entÃ£o sobrepÃµe o !important do * acima mesmo com !important aqui.
+ * então sobrepõe o !important do * acima mesmo com !important aqui.
  */
 [data-testid="stIconMaterial"] {
     font-family: "Material Symbols Rounded" !important;
@@ -765,14 +765,14 @@ st.markdown("""
     justify-content: center !important;
 }
 
-/* Esconde branding Streamlit SEM remover o botÃ£o da sidebar */
+/* Esconde branding Streamlit SEM remover o botão da sidebar */
 #MainMenu { visibility: hidden; }
 footer { visibility: hidden; }
 [data-testid="stDecoration"] { display: none !important; }
 [data-testid="stStatusWidget"] { visibility: hidden !important; }
-/* Deixa a toolbar transparente mas NÃƒO usa display:none (sidebar toggle precisa dela) */
+/* Deixa a toolbar transparente mas NÃO usa display:none (sidebar toggle precisa dela) */
 [data-testid="stToolbar"] { visibility: hidden; }
-/* Header transparente â€” toggle da sidebar permanece clicÃ¡vel */
+/* Header transparente — toggle da sidebar permanece clicável */
 header[data-testid="stHeader"] {
     background: transparent !important;
     border-bottom: none !important;
@@ -783,13 +783,13 @@ header[data-testid="stHeader"] {
     background: linear-gradient(160deg, #ffffff 0%, #f4f6fb 55%, #eaecf4 100%) !important;
 }
 
-/* EspaÃ§o para o header do Streamlit (onde fica o botÃ£o da sidebar) */
+/* Espaço para o header do Streamlit (onde fica o botão da sidebar) */
 .block-container {
     padding-top: 3.5rem !important;
     padding-bottom: 5rem !important;
 }
 
-/* â”€â”€ Header â”€â”€ */
+/* ── Header ── */
 .vw-header {
     background: linear-gradient(135deg, #001e50 0%, #002d7a 100%);
     border-radius: 12px;
@@ -800,7 +800,7 @@ header[data-testid="stHeader"] {
     margin-bottom: 2rem;
     box-shadow: 0 4px 24px rgba(0,30,80,0.18);
 }
-/* Logo VW dentro de cÃ­rculo branco */
+/* Logo VW dentro de círculo branco */
 .vw-logo-wrap {
     width: 76px;
     height: 76px;
@@ -853,7 +853,7 @@ header[data-testid="stHeader"] {
     white-space: nowrap;
 }
 
-/* â”€â”€ TÃ­tulo de seÃ§Ã£o com Ã­cone SVG â”€â”€ */
+/* ── Título de seção com ícone SVG ── */
 .section-title {
     display: flex;
     align-items: center;
@@ -867,8 +867,8 @@ header[data-testid="stHeader"] {
     letter-spacing: -0.2px;
 }
 
-/* â”€â”€ Fix texto duplicado no botÃ£o de upload â”€â”€ */
-/* Oculta TODO conteÃºdo interno do botÃ£o (qualquer variante de Streamlit) */
+/* ── Fix texto duplicado no botão de upload ── */
+/* Oculta TODO conteúdo interno do botão (qualquer variante de Streamlit) */
 [data-testid="stFileUploaderDropzone"] button > *,
 [data-testid="stFileUploaderDropzone"] button > * > *,
 [data-testid="stFileUploaderDropzoneButton"] > *,
@@ -876,7 +876,7 @@ header[data-testid="stHeader"] {
     display: none !important;
     visibility: hidden !important;
 }
-/* Substitui pelo nosso texto via ::before â€” CSS puro, nÃ£o Ã© traduzido */
+/* Substitui pelo nosso texto via ::before — CSS puro, não é traduzido */
 [data-testid="stFileUploaderDropzone"] button,
 [data-testid="stFileUploaderDropzoneButton"] {
     position: relative !important;
@@ -900,7 +900,7 @@ header[data-testid="stHeader"] {
     pointer-events: none !important;
 }
 
-/* â”€â”€ Seta animada entre header e conteÃºdo â”€â”€ */
+/* ── Seta animada entre header e conteúdo ── */
 .down-arrow-hint {
     display: flex;
     justify-content: center;
@@ -914,7 +914,7 @@ header[data-testid="stHeader"] {
     50%       { transform: translateY(8px);  opacity: 1;    }
 }
 
-/* â”€â”€ Buttons â”€â”€ */
+/* ── Buttons ── */
 .stButton > button[kind="primary"] {
     background: #001e50 !important;
     color: #ffffff !important;
@@ -931,23 +931,23 @@ header[data-testid="stHeader"] {
     transform: translateY(-1px) !important;
 }
 
-/* â”€â”€ Headings â”€â”€ */
+/* ── Headings ── */
 h2, h3 {
     color: #001e50 !important;
     font-weight: 600 !important;
 }
 
-/* â”€â”€ Progress bar â”€â”€ */
+/* ── Progress bar ── */
 .stProgress > div > div > div {
     background: linear-gradient(90deg, #001e50, #0057b8) !important;
 }
 
-/* â”€â”€ Alerts â”€â”€ */
+/* ── Alerts ── */
 div[data-testid="stAlert"] {
     border-radius: 8px !important;
 }
 
-/* â”€â”€ Footer â”€â”€ */
+/* ── Footer ── */
 .vw-footer {
     position: fixed;
     bottom: 0; left: 0; right: 0;
@@ -979,7 +979,7 @@ div[data-testid="stAlert"] {
 </style>
 """, unsafe_allow_html=True)
 
-# â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Header ───────────────────────────────────────────────────────────────────
 _vw_inner = (
     f'<img src="data:image/png;base64,{_vw_b64}" alt="Volkswagen">'
     if _vw_b64 else
@@ -991,27 +991,27 @@ st.markdown(f"""
     <div class="vw-header-sep"></div>
     <div class="vw-header-text">
         <h1>Flow F&amp;I</h1>
-        <p>Banco Volkswagen Â· CCB â€” Processamento automatizado via Gemini AI</p>
+        <p>Banco Volkswagen · CCB — Processamento automatizado via Gemini AI</p>
     </div>
     <span class="vw-header-badge">Financiamentos VW</span>
 </div>
 """, unsafe_allow_html=True)
 
-# â”€â”€ Footer (posiÃ§Ã£o fixa) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Footer (posição fixa) ─────────────────────────────────────────────────────
 _brasal_img = (
-    f'<img src="data:image/png;base64,{_brasal_b64}" alt="Brasal VeÃ­culos">'
+    f'<img src="data:image/png;base64,{_brasal_b64}" alt="Brasal Veículos">'
     if _brasal_b64 else
-    '<span style="color:#6b7280;font-size:0.85rem;font-weight:500;">Brasal VeÃ­culos</span>'
+    '<span style="color:#6b7280;font-size:0.85rem;font-weight:500;">Brasal Veículos</span>'
 )
 st.markdown(f"""
 <div class="vw-footer">
     {_brasal_img}
     <div class="vw-footer-sep"></div>
-    <span class="vw-footer-version">v1.3 Â· Banco Volkswagen CCB</span>
+    <span class="vw-footer-version">v1.3 · Banco Volkswagen CCB</span>
 </div>
 """, unsafe_allow_html=True)
 
-# â”€â”€ Auto-restore de sessÃ£o Microsoft a partir do cache local â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Auto-restore de sessão Microsoft a partir do cache local ─────────────────
 if st.session_state.get("_msal_auth_status", "not_auth") == "not_auth":
     _disk = _load_token_cache()
     if _disk and _disk.get("refresh_token"):
@@ -1021,19 +1021,19 @@ if st.session_state.get("_msal_auth_status", "not_auth") == "not_auth":
         st.session_state["_msal_user_email"]  = _disk.get("email", "")
         st.session_state["_msal_auth_status"] = "authenticated"
 
-# â”€â”€ ConfiguraÃ§Ãµes (popover) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Configurações (popover) ───────────────────────────────────────────────────
 _gemini_default    = os.getenv("GEMINI_API_KEY")       or st.secrets.get("GEMINI_API_KEY",       "")
 _client_id_default = os.getenv("AZURE_CLIENT_ID")     or st.secrets.get("AZURE_CLIENT_ID",      "4c19cc34-0c80-4dcd-9d8c-f0e35c0f48b5")
 _excel_url_default = os.getenv("EXCEL_SHARING_URL")   or st.secrets.get("EXCEL_SHARING_URL",    "https://1drv.ms/x/c/34eb48bbe5babf33/IQBkkgUSG37eT7AUIIT0EnFIAawdB8KZ6Yx5ypjyblkZbdU?e=DuWAzF")
 
-with st.popover("âš™ï¸  ConfiguraÃ§Ãµes"):
+with st.popover("⚙️  Configurações"):
     col1, col2 = st.columns(2)
     with col1:
         api_key = st.text_input(
             "Gemini API Key",
             value=_gemini_default,
             type="password",
-            help="Chave gratuita em: aistudio.google.com â†’ Get API Key",
+            help="Chave gratuita em: aistudio.google.com → Get API Key",
             key="cfg_api_key",
         )
     with col2:
@@ -1041,22 +1041,22 @@ with st.popover("âš™ï¸  ConfiguraÃ§Ãµes"):
             "Azure Client ID",
             value=_client_id_default,
             type="password",
-            help="Azure Portal â†’ App registrations â†’ VisÃ£o geral â†’ Application (client) ID",
+            help="Azure Portal → App registrations → Visão geral → Application (client) ID",
             key="cfg_client_id",
         )
     excel_url = st.text_input(
-        "Link do Excel â€” Contratos (OneDrive)",
+        "Link do Excel — Contratos (OneDrive)",
         value=_excel_url_default,
-        help="OneDrive â†’ abrir arquivo â†’ Compartilhar â†’ Copiar link",
+        help="OneDrive → abrir arquivo → Compartilhar → Copiar link",
         key="cfg_excel_url",
     )
     st.divider()
 
-    # â”€â”€ Login Microsoft (device code flow) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Login Microsoft (device code flow) ───────────────────────────────────
     _auth_st = st.session_state.get("_msal_auth_status", "not_auth")
 
     if _auth_st == "not_auth":
-        if st.button("ðŸ”‘ Conectar conta Microsoft", key="btn_ms_login",
+        if st.button("🔑 Conectar conta Microsoft", key="btn_ms_login",
                      use_container_width=True, disabled=not az_client_id):
             _app_tmp = msal.PublicClientApplication(
                 az_client_id,
@@ -1076,17 +1076,17 @@ with st.popover("âš™ï¸  ConfiguraÃ§Ãµes"):
         _flow = st.session_state.get("_msal_device_flow", {})
         st.info(
             f"**1.** Acesse: **{_flow.get('verification_uri','https://microsoft.com/devicelogin')}**\n\n"
-            f"**2.** Insira o cÃ³digo: **`{_flow.get('user_code','...')}`**\n\n"
-            f"**3.** FaÃ§a login com sua conta Microsoft e clique abaixo"
+            f"**2.** Insira o código: **`{_flow.get('user_code','...')}`**\n\n"
+            f"**3.** Faça login com sua conta Microsoft e clique abaixo"
         )
         col_ok, col_cancel = st.columns(2)
         with col_ok:
-            if st.button("âœ… JÃ¡ fiz o login", key="btn_check_auth", use_container_width=True):
+            if st.button("✅ Já fiz o login", key="btn_check_auth", use_container_width=True):
                 if st.session_state.get("_msal_auth_status") != "authenticated":
                     st.session_state["_msal_auth_status"] = "checking"
                 st.rerun()
         with col_cancel:
-            if st.button("â†© Cancelar", key="btn_cancel_auth", use_container_width=True):
+            if st.button("↩ Cancelar", key="btn_cancel_auth", use_container_width=True):
                 st.session_state["_msal_auth_status"] = "not_auth"
                 st.rerun()
 
@@ -1095,12 +1095,12 @@ with st.popover("âš™ï¸  ConfiguraÃ§Ãµes"):
         _cid_chk  = st.session_state.get("_msal_client_id_flow", az_client_id)
         _dc       = _flow_chk.get("device_code", "")
         if not _dc:
-            st.error("SessÃ£o expirada â€” inicie o login novamente.")
-            if st.button("â†© Voltar", key="btn_chk_back", use_container_width=True):
+            st.error("Sessão expirada — inicie o login novamente.")
+            if st.button("↩ Voltar", key="btn_chk_back", use_container_width=True):
                 st.session_state["_msal_auth_status"] = "not_auth"
                 st.rerun()
         else:
-            st.info("â³ Verificando autenticaÃ§Ã£o com a Microsoftâ€¦")
+            st.info("⏳ Verificando autenticação com a Microsoft…")
             _res = _poll_once(_dc, _cid_chk)
             if "access_token" in _res:
                 _tok_exp = _time.time() + _res.get("expires_in", 3600)
@@ -1125,17 +1125,17 @@ with st.popover("âš™ï¸  ConfiguraÃ§Ãµes"):
                 st.rerun()
             else:
                 _err_msg = _res.get("error_description", _res.get("error", ""))
-                st.error("âŒ AutenticaÃ§Ã£o nÃ£o concluÃ­da."
+                st.error("❌ Autenticação não concluída."
                          + (f"\n\nDetalhe: `{_err_msg}`" if _err_msg else ""))
-                if st.button("â†© Tentar novamente", key="btn_retry_auth", use_container_width=True):
+                if st.button("↩ Tentar novamente", key="btn_retry_auth", use_container_width=True):
                     st.session_state["_msal_auth_status"] = "not_auth"
                     st.session_state.pop("_msal_auth_error", None)
                     st.rerun()
 
     elif _auth_st == "authenticated":
         _user_email = st.session_state.get("_msal_user_email", "")
-        st.success(f"âœ… Conectado: **{_user_email}**")
-        if st.button("ðŸšª Desconectar", key="btn_ms_logout", use_container_width=True):
+        st.success(f"✅ Conectado: **{_user_email}**")
+        if st.button("🚪 Desconectar", key="btn_ms_logout", use_container_width=True):
             for _k in ("_ms_token", "_ms_token_exp", "_ms_refresh_token",
                        "_msal_user_email", "_msal_device_flow", "_msal_client_id_flow"):
                 st.session_state.pop(_k, None)
@@ -1148,17 +1148,17 @@ with st.popover("âš™ï¸  ConfiguraÃ§Ãµes"):
         st.session_state.get("_msal_auth_status") == "authenticated"
     )
     if not excel_ok and _auth_st not in ("pending", "checking", "authenticated"):
-        st.caption("ðŸ’¡ Preencha o Client ID, o link do Excel e faÃ§a login para inserir dados.")
+        st.caption("💡 Preencha o Client ID, o link do Excel e faça login para inserir dados.")
 
     if excel_ok:
         st.divider()
-        st.markdown("**ðŸ“… PerÃ­odo de Fechamento**")
-        st.caption("Define o perÃ­odo visÃ­vel pelos vendedores na aba Minha ProduÃ§Ã£o.")
+        st.markdown("**📅 Período de Fechamento**")
+        st.caption("Define o período visível pelos vendedores na aba Minha Produção.")
         _pf_ini_atual, _pf_fim_atual = load_periodo_fechamento(az_client_id, excel_url)
         _pf_col1, _pf_col2 = st.columns(2)
         with _pf_col1:
             _pf_ini = st.date_input(
-                "InÃ­cio", value=_pf_ini_atual or date.today().replace(day=1),
+                "Início", value=_pf_ini_atual or date.today().replace(day=1),
                 key="cfg_pf_ini", format="DD/MM/YYYY",
             )
         with _pf_col2:
@@ -1166,22 +1166,22 @@ with st.popover("âš™ï¸  ConfiguraÃ§Ãµes"):
                 "Fim", value=_pf_fim_atual or date.today(),
                 key="cfg_pf_fim", format="DD/MM/YYYY",
             )
-        if st.button("ðŸ’¾ Salvar perÃ­odo", key="cfg_salvar_periodo", use_container_width=True):
+        if st.button("💾 Salvar período", key="cfg_salvar_periodo", use_container_width=True):
             _err_pf = save_periodo_fechamento(az_client_id, excel_url, _pf_ini, _pf_fim)
             if _err_pf:
                 st.error(_err_pf)
             else:
-                st.success("âœ… PerÃ­odo salvo!")
+                st.success("✅ Período salvo!")
 
 _tab_c, _tab_com, _tab_graf, _tab_vend = st.tabs([
-    "ðŸ“‹  Contratos Banco VW", "ðŸ’°  ComissÃ£o", "ðŸ“ˆ  GrÃ¡ficos", "ðŸ‘¤  Minha ProduÃ§Ã£o",
+    "📋  Contratos Banco VW", "💰  Comissão", "📈  Gráficos", "👤  Minha Produção",
 ])
 
 with _tab_c:
     if not st.session_state.get("_cont_autenticado"):
         st.markdown(
             "<p style='font-size:1.1rem;font-weight:700;color:#001e50;"
-            "margin-bottom:1rem'>🔒 Área Restrita — Contratos Banco VW</p>",
+            "margin-bottom:1rem'>\U0001F512 Area Restrita — Contratos Banco VW</p>",
             unsafe_allow_html=True,
         )
         with st.container(border=True):
@@ -1191,11 +1191,11 @@ with _tab_c:
                 key="input_senha_cont",
                 placeholder="Digite a senha...",
             )
-            if st.button("🔓 Entrar", key="btn_senha_cont", use_container_width=True):
+            if st.button("\U0001F513 Entrar", key="btn_senha_cont", use_container_width=True):
                 try:
                     _senha_correta_c = st.secrets["SENHA_COMISSAO"]
                 except Exception:
-                    st.error("⚠️ Senha não configurada. Adicione SENHA_COMISSAO nos Secrets do Streamlit.")
+                    st.error("⚠️ Senha nao configurada. Adicione SENHA_COMISSAO nos Secrets do Streamlit.")
                     _senha_correta_c = None
                 if _senha_correta_c and _senha_digitada_c == _senha_correta_c:
                     st.session_state["_cont_autenticado"] = True
@@ -1205,7 +1205,7 @@ with _tab_c:
     else:
         _col_cont, _col_lock_c = st.columns([10, 1])
         with _col_lock_c:
-            if st.button("🔒", key="btn_travar_cont", help="Travar acesso aos Contratos"):
+            if st.button("\U0001F512", key="btn_travar_cont", help="Travar acesso aos Contratos"):
                 st.session_state.pop("_cont_autenticado", None)
                 st.rerun()
         st.markdown("""
@@ -1220,7 +1220,7 @@ with _tab_c:
         </div>
         """, unsafe_allow_html=True)
     
-        # â”€â”€ Seletor de aba de destino â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # ── Seletor de aba de destino ─────────────────────────────────────────────
         st.markdown("""
         <style>
         div[data-testid="stHorizontalBlock"]:has(> div > div[data-testid="stSelectbox"]#aba_destino_wrap) {
@@ -1248,7 +1248,7 @@ with _tab_c:
     
         aba_selecionada = "BASE_PAGAMENTOS"
     
-        # Chave dinÃ¢mica â€” incrementar forÃ§a o uploader a resetar (limpar arquivos)
+        # Chave dinâmica — incrementar força o uploader a resetar (limpar arquivos)
         if "_uploader_key" not in st.session_state:
             st.session_state["_uploader_key"] = 0
     
@@ -1262,35 +1262,35 @@ with _tab_c:
     
         if arquivos:
             n = len(arquivos)
-            st.info(f"**{n} arquivo(s) carregado(s).** Clique em Processar para extrair as informaÃ§Ãµes.")
+            st.info(f"**{n} arquivo(s) carregado(s).** Clique em Processar para extrair as informações.")
     
             col_btn, col_lim, _ = st.columns([2, 1, 2])
             with col_btn:
-                processar = st.button("ðŸ” Processar Contratos", type="primary", use_container_width=True)
+                processar = st.button("🔍 Processar Contratos", type="primary", use_container_width=True)
             with col_lim:
-                if st.button("ðŸ—‘ï¸ Limpar arquivos", use_container_width=True, key="btn_clear_uploader"):
+                if st.button("🗑️ Limpar arquivos", use_container_width=True, key="btn_clear_uploader"):
                     st.session_state["_uploader_key"] += 1
                     st.rerun()
     
             if processar:
                 if not api_key:
-                    st.error("Informe a Gemini API Key nas configuraÃ§Ãµes.")
+                    st.error("Informe a Gemini API Key nas configurações.")
                     st.stop()
     
                 resultados = []
                 erros      = []
                 data_hoje  = datetime.now().strftime("%d/%m/%Y")
     
-                # Barra de progresso geral (avanÃ§a a cada arquivo concluÃ­do)
-                barra = st.progress(0, text="Iniciando extraÃ§Ã£o...")
+                # Barra de progresso geral (avança a cada arquivo concluído)
+                barra = st.progress(0, text="Iniciando extração...")
     
-                # st.status: spinner CSS animado pelo cliente â€” nÃ£o depende de updates do servidor
-                with st.status("â³ Processando contratos via Gemini AIâ€¦", expanded=True) as _status:
+                # st.status: spinner CSS animado pelo cliente — não depende de updates do servidor
+                with st.status("⏳ Processando contratos via Gemini AI…", expanded=True) as _status:
                     for i, arq in enumerate(arquivos):
                         barra.progress(i / n, text=f"Contrato {i + 1}/{n}: **{arq.name}**")
-                        st.write(f"ðŸ” Lendo: **{arq.name}**")
+                        st.write(f"🔍 Lendo: **{arq.name}**")
     
-                        # Thread separada para a chamada Ã  API
+                        # Thread separada para a chamada à API
                         _slot = {"raw": None, "err": None}
                         _pdf  = arq.read()
     
@@ -1303,55 +1303,55 @@ with _tab_c:
                         _t = threading.Thread(target=_worker, daemon=True)
                         _t.start()
     
-                        # AnimaÃ§Ã£o da barra enquanto aguarda
+                        # Animação da barra enquanto aguarda
                         _p     = i / n
                         _teto  = (i / n) + (1 / n) * 0.90
                         _passo = (1 / n) * 0.90 / 60   # ~30 s para cobrir 90 % do segmento
                         while _t.is_alive():
                             _p = min(_p + _passo, _teto)
-                            barra.progress(_p, text=f"â³ Gemini AI analisando: **{arq.name}**")
+                            barra.progress(_p, text=f"⏳ Gemini AI analisando: **{arq.name}**")
                             _time.sleep(0.5)
     
                         _t.join()
     
                         if _slot["err"]:
                             erros.append({"arquivo": arq.name, "erro": _slot["err"]})
-                            st.write(f"âŒ Erro: **{arq.name}**")
+                            st.write(f"❌ Erro: **{arq.name}**")
                         else:
                             try:
                                 processado = aplicar_regras(_slot["raw"], data_hoje)
                                 processado["_arquivo"] = arq.name
                                 resultados.append(processado)
-                                st.write(f"âœ… ConcluÃ­do: **{arq.name}**")
+                                st.write(f"✅ Concluído: **{arq.name}**")
                             except Exception as exc:
                                 erros.append({"arquivo": arq.name, "erro": str(exc)})
-                                st.write(f"âŒ Erro ao processar: **{arq.name}**")
+                                st.write(f"❌ Erro ao processar: **{arq.name}**")
     
-                        barra.progress((i + 1) / n, text=f"âœ… {i + 1}/{n} concluÃ­do(s)")
+                        barra.progress((i + 1) / n, text=f"✅ {i + 1}/{n} concluído(s)")
     
-                    barra.progress(1.0, text="âœ… Processamento concluÃ­do!")
+                    barra.progress(1.0, text="✅ Processamento concluído!")
     
                     if erros:
-                        _status.update(label=f"âš ï¸ ConcluÃ­do com {len(erros)} erro(s)", state="error")
+                        _status.update(label=f"⚠️ Concluído com {len(erros)} erro(s)", state="error")
                     else:
                         _status.update(
-                            label=f"âœ… {len(resultados)} contrato(s) extraÃ­do(s) com sucesso!",
+                            label=f"✅ {len(resultados)} contrato(s) extraído(s) com sucesso!",
                             state="complete",
                         )
     
                 for erro in erros:
-                    st.error(f"âŒ Erro em **{erro['arquivo']}**: {erro['erro']}")
+                    st.error(f"❌ Erro em **{erro['arquivo']}**: {erro['erro']}")
     
                 if resultados:
                     st.session_state["resultados"] = resultados
                     st.rerun()
     
-        # â”€â”€ PrÃ©via e InserÃ§Ã£o â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # ── Prévia e Inserção ────────────────────────────────────────────────────────
         if st.session_state.get("resultados"):
             resultados = st.session_state["resultados"]
     
-            st.success(f"âœ… **{len(resultados)} contrato(s) extraÃ­do(s)** â€” revise os dados abaixo antes de inserir.")
-            st.subheader("ðŸ“‹ PrÃ©via dos Dados")
+            st.success(f"✅ **{len(resultados)} contrato(s) extraído(s)** — revise os dados abaixo antes de inserir.")
+            st.subheader("📋 Prévia dos Dados")
     
             df = pd.DataFrame([
                 {
@@ -1361,7 +1361,7 @@ with _tab_c:
                     "CPF/CNPJ":       r["cpf_cnpj"],
                     "Vendedor":       r["vendedor"],
                     "Equipe":         r["equipe"],
-                    "Vr. VeÃ­culo":    f"R$ {r['valor_veiculo']:,.2f}",
+                    "Vr. Veículo":    f"R$ {r['valor_veiculo']:,.2f}",
                     "Entrada":        f"R$ {r['entrada']:,.2f}",
                     "Vr. Financiado": f"R$ {r['valor_financiado']:,.2f}",
                     "SPF":            r["spf"],
@@ -1387,31 +1387,31 @@ with _tab_c:
             col_ins, col_lim = st.columns([4, 1])
     
             with col_lim:
-                if st.button("ðŸ—‘ï¸ Limpar", use_container_width=True):
+                if st.button("🗑️ Limpar", use_container_width=True):
                     del st.session_state["resultados"]
                     st.rerun()
     
             with col_ins:
-                label_btn = f"âœ… Inserir {len(resultados)} linha(s) na planilha â†’ aba {aba_selecionada}"
+                label_btn = f"✅ Inserir {len(resultados)} linha(s) na planilha → aba {aba_selecionada}"
     
                 if not excel_ok:
-                    st.warning("FaÃ§a login com sua conta Microsoft nas ConfiguraÃ§Ãµes para habilitar a inserÃ§Ã£o.")
+                    st.warning("Faça login com sua conta Microsoft nas Configurações para habilitar a inserção.")
                 else:
                     if st.button(label_btn, type="primary", use_container_width=True):
                         try:
                             linhas = [para_linha_sheets(r) for r in resultados]
-                            with st.spinner(f"â³ Inserindo {len(linhas)} linha(s) na planilhaâ€¦"):
+                            with st.spinner(f"⏳ Inserindo {len(linhas)} linha(s) na planilha…"):
                                 linha_ini = inserir_linhas_excel(linhas, az_client_id, excel_url, aba_selecionada)
                             st.success(
-                                f"âœ… **{len(linhas)} linha(s)** inserida(s) com sucesso na aba "
+                                f"✅ **{len(linhas)} linha(s)** inserida(s) com sucesso na aba "
                                 f"**{aba_selecionada}** a partir da linha **{linha_ini}**!"
                             )
                             del st.session_state["resultados"]
                             st.balloons()
                         except Exception as e:
-                            st.error(f"âŒ Erro ao inserir no Excel: {e}")
+                            st.error(f"❌ Erro ao inserir no Excel: {e}")
     
-        # â”€â”€ Outros Bancos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # ── Outros Bancos ─────────────────────────────────────────────────────────
         st.markdown(
             '<hr style="border:none;border-top:2px solid #eaecf4;margin:2.5rem 0 1.5rem 0;">',
             unsafe_allow_html=True,
@@ -1427,7 +1427,7 @@ with _tab_c:
         <span>Outros Bancos</span>
     </div>
     <p style="color:#6b7280;font-size:0.875rem;margin:-0.5rem 0 1.25rem 32px;">
-        Financiamentos realizados por outras instituiÃ§Ãµes financeiras
+        Financiamentos realizados por outras instituições financeiras
     </p>
     """, unsafe_allow_html=True)
     
@@ -1470,7 +1470,7 @@ with _tab_c:
             with col_ob5:
                 ob_spf = st.selectbox(
                     "SPF *",
-                    options=["", "Sim", "NÃ£o"],
+                    options=["", "Sim", "Não"],
                     key="ob_spf",
                 )
             with col_ob6:
@@ -1497,13 +1497,13 @@ with _tab_c:
                     ob_vendedor = st.text_input(
                         "Nome do vendedor",
                         key="ob_vendedor_manual",
-                        placeholder="Digite o nome completo em MAIÃšSCULAS",
+                        placeholder="Digite o nome completo em MAIÚSCULAS",
                     )
                 else:
                     ob_vendedor = ob_vend_sel
                 if ob_vendedor and ob_vendedor != "[ Outro... ]":
                     _ob_equipe = lookup_vendedor(ob_vendedor)
-                    st.caption(f"ðŸ¢ Equipe: **{_ob_equipe}**")
+                    st.caption(f"🏢 Equipe: **{_ob_equipe}**")
                 else:
                     _ob_equipe = ""
     
@@ -1514,7 +1514,7 @@ with _tab_c:
     
             col_ob_add, _ = st.columns([1, 4])
             with col_ob_add:
-                ob_add = st.button("âž• Adicionar Ã  lista", key="ob_add", use_container_width=True)
+                ob_add = st.button("➕ Adicionar à lista", key="ob_add", use_container_width=True)
     
         if ob_add:
             _ob_erros = []
@@ -1536,7 +1536,7 @@ with _tab_c:
                 _ob_erros.append("Vendedor")
     
             if _ob_erros:
-                st.warning(f"âš ï¸ Preencha os campos obrigatÃ³rios: **{', '.join(_ob_erros)}**")
+                st.warning(f"⚠️ Preencha os campos obrigatórios: **{', '.join(_ob_erros)}**")
             else:
                 _ob_now   = datetime.now()
                 _ob_data  = _ob_now.strftime("%d/%m/%Y")
@@ -1561,7 +1561,7 @@ with _tab_c:
     
         if st.session_state["ob_items"]:
             _ob_items = st.session_state["ob_items"]
-            st.success(f"**{len(_ob_items)} contrato(s)** na fila â€” confira abaixo antes de inserir na planilha.")
+            st.success(f"**{len(_ob_items)} contrato(s)** na fila — confira abaixo antes de inserir na planilha.")
     
             _ob_df = pd.DataFrame([
                 {
@@ -1582,34 +1582,34 @@ with _tab_c:
     
             col_ob_ins, col_ob_lim = st.columns([4, 1])
             with col_ob_lim:
-                if st.button("ðŸ—‘ï¸ Limpar", key="ob_clear", use_container_width=True):
+                if st.button("🗑️ Limpar", key="ob_clear", use_container_width=True):
                     st.session_state["ob_items"] = []
                     st.rerun()
     
             with col_ob_ins:
                 if not excel_ok:
-                    st.warning("FaÃ§a login com sua conta Microsoft nas ConfiguraÃ§Ãµes para habilitar a inserÃ§Ã£o.")
+                    st.warning("Faça login com sua conta Microsoft nas Configurações para habilitar a inserção.")
                 else:
                     if st.button(
-                        f"âœ… Inserir {len(_ob_items)} contrato(s) na planilha â†’ aba {_aba_ob}",
+                        f"✅ Inserir {len(_ob_items)} contrato(s) na planilha → aba {_aba_ob}",
                         type="primary",
                         key="ob_inserir",
                         use_container_width=True,
                     ):
                         try:
-                            with st.spinner(f"â³ Inserindo {len(_ob_items)} contrato(s) na planilhaâ€¦"):
+                            with st.spinner(f"⏳ Inserindo {len(_ob_items)} contrato(s) na planilha…"):
                                 _ob_linhas = [para_linha_outros_bancos(it) for it in _ob_items]
                                 _ob_ini = inserir_linhas_excel(_ob_linhas, az_client_id, excel_url, _aba_ob)
                             st.success(
-                                f"âœ… **{len(_ob_items)} contrato(s)** inserido(s) com sucesso na aba "
+                                f"✅ **{len(_ob_items)} contrato(s)** inserido(s) com sucesso na aba "
                                 f"**{_aba_ob}** a partir da linha **{_ob_ini}**!"
                             )
                             st.session_state["ob_items"] = []
                             st.balloons()
                         except Exception as e:
-                            st.error(f"âŒ Erro ao inserir: {e}")
+                            st.error(f"❌ Erro ao inserir: {e}")
     
-        # â”€â”€ Cadastro Avulso â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # ── Cadastro Avulso ───────────────────────────────────────────────────────────
         st.markdown(
             '<hr style="border:none;border-top:2px solid #eaecf4;margin:2.5rem 0 1.5rem 0;">',
             unsafe_allow_html=True,
@@ -1625,7 +1625,7 @@ with _tab_c:
             <span>Cadastro Avulso</span>
         </div>
         <p style="color:#6b7280;font-size:0.875rem;margin:-0.5rem 0 1.25rem 32px;">
-            Garantias &nbsp;Â·&nbsp; Seguros &nbsp;Â·&nbsp; VW Protege &mdash; produtos inseridos fora do financiamento
+            Garantias &nbsp;·&nbsp; Seguros &nbsp;·&nbsp; VW Protege &mdash; produtos inseridos fora do financiamento
         </p>
         """, unsafe_allow_html=True)
     
@@ -1634,15 +1634,15 @@ with _tab_c:
     
         aba_selecionada_av = "BASE_PAGAMENTOS"
     
-        # FormulÃ¡rio de entrada
+        # Formulário de entrada
         with st.container(border=True):
-            # Linha 1 â€” Nome e CPF
+            # Linha 1 — Nome e CPF
             col_av_nome, col_av_cpf = st.columns(2)
             with col_av_nome:
                 av_nome = st.text_input(
                     "Nome do Cliente",
                     key="av_nome",
-                    placeholder="Ex: JOÃƒO SILVA SANTOS",
+                    placeholder="Ex: JOÃO SILVA SANTOS",
                 )
             with col_av_cpf:
                 av_cpf = st.text_input(
@@ -1651,7 +1651,7 @@ with _tab_c:
                     placeholder="000.000.000-00",
                 )
     
-            # Linha 2 â€” Vendedor | Categoria | Produto (cascata)
+            # Linha 2 — Vendedor | Categoria | Produto (cascata)
             col_av_vend, col_av_cat, col_av_prod = st.columns(3)
             with col_av_vend:
                 av_vendedor = st.selectbox(
@@ -1660,7 +1660,7 @@ with _tab_c:
                     key="av_vendedor",
                 )
                 _av_equipe = lookup_vendedor(av_vendedor)
-                st.caption(f"ðŸ¢ Equipe: **{_av_equipe}**")
+                st.caption(f"🏢 Equipe: **{_av_equipe}**")
     
             with col_av_cat:
                 av_cat = st.selectbox(
@@ -1670,25 +1670,25 @@ with _tab_c:
                 )
     
             with col_av_prod:
-                # Chave dinÃ¢mica garante reset ao trocar de categoria
+                # Chave dinâmica garante reset ao trocar de categoria
                 av_prod = st.selectbox(
                     "Produto",
                     options=PRODUTOS_AVULSO[av_cat],
                     key=f"av_produto_{av_cat}",
                 )
                 _av_pts = PONTOS_AVULSO.get(av_prod, 0)
-                st.caption(f"â­ Pontos: **{_av_pts}**")
+                st.caption(f"⭐ Pontos: **{_av_pts}**")
     
-            # BotÃ£o Adicionar
+            # Botão Adicionar
             col_av_add, _col_sp = st.columns([1, 4])
             with col_av_add:
-                av_add = st.button("âž• Adicionar Ã  lista", key="av_add", use_container_width=True)
+                av_add = st.button("➕ Adicionar à lista", key="av_add", use_container_width=True)
     
         if av_add:
             if not av_nome.strip():
-                st.warning("âš ï¸ Informe o nome do cliente.")
+                st.warning("⚠️ Informe o nome do cliente.")
             elif not av_cpf.strip():
-                st.warning("âš ï¸ Informe o CPF.")
+                st.warning("⚠️ Informe o CPF.")
             else:
                 st.session_state["avulso_items"].append({
                     "nome":      av_nome.strip().upper(),
@@ -1702,10 +1702,10 @@ with _tab_c:
                 })
                 st.rerun()
     
-        # PrÃ©via da fila e botÃ£o de inserÃ§Ã£o
+        # Prévia da fila e botão de inserção
         if st.session_state["avulso_items"]:
             _av_items = st.session_state["avulso_items"]
-            st.success(f"**{len(_av_items)} item(ns)** na fila â€” confira abaixo antes de inserir na planilha.")
+            st.success(f"**{len(_av_items)} item(ns)** na fila — confira abaixo antes de inserir na planilha.")
     
             _av_df = pd.DataFrame([
                 {
@@ -1724,37 +1724,37 @@ with _tab_c:
             col_av_ins, col_av_lim = st.columns([4, 1])
     
             with col_av_lim:
-                if st.button("ðŸ—‘ï¸ Limpar", key="av_clear", use_container_width=True):
+                if st.button("🗑️ Limpar", key="av_clear", use_container_width=True):
                     st.session_state["avulso_items"] = []
                     st.rerun()
     
             with col_av_ins:
                 if not excel_ok:
-                    st.warning("FaÃ§a login com sua conta Microsoft nas ConfiguraÃ§Ãµes para habilitar a inserÃ§Ã£o.")
+                    st.warning("Faça login com sua conta Microsoft nas Configurações para habilitar a inserção.")
                 else:
                     if st.button(
-                        f"âœ… Inserir {len(_av_items)} item(ns) na planilha â†’ aba {aba_selecionada_av}",
+                        f"✅ Inserir {len(_av_items)} item(ns) na planilha → aba {aba_selecionada_av}",
                         type="primary",
                         key="av_inserir",
                         use_container_width=True,
                     ):
                         try:
-                            with st.spinner(f"â³ Inserindo {len(_av_items)} item(ns) na planilhaâ€¦"):
+                            with st.spinner(f"⏳ Inserindo {len(_av_items)} item(ns) na planilha…"):
                                 _av_ini = inserir_e_colorir_excel(_av_items, az_client_id, excel_url, aba_selecionada_av)
                             st.success(
-                                f"âœ… **{len(_av_items)} item(ns)** inserido(s) com sucesso na aba "
+                                f"✅ **{len(_av_items)} item(ns)** inserido(s) com sucesso na aba "
                                 f"**{aba_selecionada_av}** a partir da linha **{_av_ini}**!"
                             )
                             st.session_state["avulso_items"] = []
                             st.balloons()
                         except Exception as e:
-                            st.error(f"âŒ Erro ao inserir: {e}")
+                            st.error(f"❌ Erro ao inserir: {e}")
     
 with _tab_com:
     if not st.session_state.get("_comm_autenticado"):
         st.markdown(
             "<p style='font-size:1.1rem;font-weight:700;color:#001e50;"
-            "margin-bottom:1rem'>ðŸ”’ Ãrea Restrita â€” ComissÃ£o</p>",
+            "margin-bottom:1rem'>🔒 Área Restrita — Comissão</p>",
             unsafe_allow_html=True,
         )
         with st.container(border=True):
@@ -1764,58 +1764,28 @@ with _tab_com:
                 key="input_senha_comm",
                 placeholder="Digite a senha...",
             )
-            if st.button("ðŸ”“ Entrar", key="btn_senha_comm", use_container_width=True):
+            if st.button("🔓 Entrar", key="btn_senha_comm", use_container_width=True):
                 try:
                     _senha_correta = st.secrets["SENHA_COMISSAO"]
                 except Exception:
-                    st.error("âš ï¸ Senha nÃ£o configurada. Adicione SENHA_COMISSAO nos Secrets do Streamlit.")
+                    st.error("⚠️ Senha não configurada. Adicione SENHA_COMISSAO nos Secrets do Streamlit.")
                     _senha_correta = None
                 if _senha_correta and _senha_digitada == _senha_correta:
                     st.session_state["_comm_autenticado"] = True
                     st.rerun()
                 elif _senha_correta:
-                    st.error("âŒ Senha incorreta.")
+                    st.error("❌ Senha incorreta.")
     else:
         _col_comm, _col_lock = st.columns([10, 1])
         with _col_lock:
-            if st.button("ðŸ”’", key="btn_travar_comm", help="Travar acesso Ã  ComissÃ£o"):
+            if st.button("🔒", key="btn_travar_comm", help="Travar acesso à Comissão"):
                 st.session_state.pop("_comm_autenticado", None)
                 st.rerun()
         _render_comm(az_client_id, excel_url)
 
 with _tab_graf:
-    if not st.session_state.get("_graf_autenticado"):
-        st.markdown(
-            "<p style='font-size:1.1rem;font-weight:700;color:#001e50;"
-            "margin-bottom:1rem'>ðŸ”’ Ãrea Restrita â€” GrÃ¡ficos</p>",
-            unsafe_allow_html=True,
-        )
-        with st.container(border=True):
-            _senha_digitada_g = st.text_input(
-                "Senha de acesso",
-                type="password",
-                key="input_senha_graf",
-                placeholder="Digite a senha...",
-            )
-            if st.button("ðŸ”“ Entrar", key="btn_senha_graf", use_container_width=True):
-                try:
-                    _senha_correta_g = st.secrets["SENHA_COMISSAO"]
-                except Exception:
-                    st.error("âš ï¸ Senha nÃ£o configurada. Adicione SENHA_COMISSAO nos Secrets do Streamlit.")
-                    _senha_correta_g = None
-                if _senha_correta_g and _senha_digitada_g == _senha_correta_g:
-                    st.session_state["_graf_autenticado"] = True
-                    st.rerun()
-                elif _senha_correta_g:
-                    st.error("âŒ Senha incorreta.")
-    else:
-        _col_graf, _col_lock_g = st.columns([10, 1])
-        with _col_lock_g:
-            if st.button("ðŸ”’", key="btn_travar_graf", help="Travar acesso aos GrÃ¡ficos"):
-                st.session_state.pop("_graf_autenticado", None)
-                st.rerun()
-        from graficos import render_graficos as _render_graf
-        _render_graf(az_client_id, excel_url)
+    from graficos import render_graficos as _render_graf
+    _render_graf(az_client_id, excel_url)
 
 with _tab_vend:
     _render_vend(az_client_id, excel_url)
