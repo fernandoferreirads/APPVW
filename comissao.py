@@ -19,6 +19,9 @@ import time
 from datetime import date, datetime
 from urllib.parse import quote as _url_quote
 
+from google.auth.transport.requests import Request as _GSRequest
+from google.oauth2.service_account import Credentials as _GSCreds
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -307,6 +310,77 @@ def _read_range(token: str, drive_id: str, item_id: str, ws_id: str) -> list[lis
     )
     r.raise_for_status()
     return r.json().get("values", [])
+
+
+# ─── Google Sheets — service account (sem auth MSAL) ─────────────────────────
+
+def _gs_token() -> str:
+    """Retorna access token do Google Sheets via service account (sem login do usuário)."""
+    tok = st.session_state.get("_gs_sa_token")
+    exp = st.session_state.get("_gs_sa_exp", 0)
+    if tok and time.time() < exp - 60:
+        return tok
+    sa_info = {k: v for k, v in st.secrets["gcp_service_account"].items()}
+    creds   = _GSCreds.from_service_account_info(
+        sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets"]
+    )
+    creds.refresh(_GSRequest())
+    st.session_state["_gs_sa_token"] = creds.token
+    st.session_state["_gs_sa_exp"]   = creds.expiry.timestamp() if creds.expiry else time.time() + 3600
+    return creds.token
+
+
+def _gs_save_periodo(data_ini: date, data_fim: date) -> None:
+    """Persiste período na aba CONFIGURACAO do Google Sheets (service account)."""
+    spreadsheet_id = st.secrets.get("SPREADSHEET_ID", "")
+    if not spreadsheet_id:
+        raise Exception("SPREADSHEET_ID não configurado nos secrets.")
+    token  = _gs_token()
+    hdrs   = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    values = [["chave", "valor"], ["periodo_ini", data_ini.isoformat()], ["periodo_fim", data_fim.isoformat()]]
+    url    = (
+        f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}"
+        f"/values/CONFIGURACAO!A1:B3?valueInputOption=RAW"
+    )
+    r = requests.put(url, headers=hdrs, json={"values": values}, timeout=20)
+    if r.status_code == 400:
+        # Aba CONFIGURACAO não existe — cria e tenta de novo
+        bu = f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}:batchUpdate"
+        rc = requests.post(
+            bu, headers=hdrs,
+            json={"requests": [{"addSheet": {"properties": {"title": "CONFIGURACAO"}}}]},
+            timeout=20,
+        )
+        rc.raise_for_status()
+        r = requests.put(url, headers=hdrs, json={"values": values}, timeout=20)
+    r.raise_for_status()
+
+
+def _gs_load_periodo() -> tuple[date | None, date | None]:
+    """Lê período da aba CONFIGURACAO do Google Sheets. Retorna (None, None) se não configurado."""
+    spreadsheet_id = st.secrets.get("SPREADSHEET_ID", "")
+    if not spreadsheet_id:
+        return None, None
+    token = _gs_token()
+    url   = (
+        f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}"
+        f"/values/CONFIGURACAO!A1:B3"
+    )
+    r = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=20)
+    if r.status_code in (400, 404):
+        return None, None
+    r.raise_for_status()
+    rows     = r.json().get("values", [])
+    data_map = {
+        str(row[0]).lower().strip(): str(row[1]).strip()
+        for row in rows if len(row) >= 2 and row[0] and row[1]
+    }
+    ini_str = data_map.get("periodo_ini")
+    fim_str = data_map.get("periodo_fim")
+    return (
+        date.fromisoformat(ini_str) if ini_str else None,
+        date.fromisoformat(fim_str) if fim_str else None,
+    )
 
 
 def load_bigbase(client_id: str, sharing_url: str) -> tuple[pd.DataFrame | None, str]:
@@ -1566,7 +1640,7 @@ def render_comissao(client_id: str = "", sharing_url: str = "") -> None:
 def load_periodo_fechamento(
     client_id: str, sharing_url: str
 ) -> tuple[date | None, date | None]:
-    """Lê data_ini e data_fim da aba CONFIGURACAO. Retorna (None, None) se não configurado."""
+    """Lê data_ini e data_fim do Google Sheets (sem auth Microsoft). Retorna (None, None) se não configurado."""
     cache_key = "_comm_periodo_fechamento"
     ts_key    = "_comm_ts_periodo"
     cached    = st.session_state.get(cache_key)
@@ -1574,25 +1648,8 @@ def load_periodo_fechamento(
     if cached is not None and time.time() - cached_ts < _CACHE_TTL:
         return cached
 
-    st.session_state["_comm_client_id"] = client_id
     try:
-        token             = _ms_token()
-        drive_id, item_id = _resolve_file(token, sharing_url)
-        ws_id             = _find_ws_id(token, drive_id, item_id, _ABA_CONFIGURACAO)
-        values            = _read_range(token, drive_id, item_id, ws_id)
-
-        data_map: dict[str, str] = {}
-        for row in values:
-            if len(row) >= 2 and row[0] and row[1]:
-                data_map[str(row[0]).lower().strip()] = str(row[1]).strip()
-
-        ini_str = data_map.get("periodo_ini")
-        fim_str = data_map.get("periodo_fim")
-
-        ini = date.fromisoformat(ini_str) if ini_str else None
-        fim = date.fromisoformat(fim_str) if fim_str else None
-
-        result = (ini, fim)
+        result = _gs_load_periodo()
         st.session_state[cache_key] = result
         st.session_state[ts_key]    = time.time()
         return result
@@ -1603,42 +1660,9 @@ def load_periodo_fechamento(
 def save_periodo_fechamento(
     client_id: str, sharing_url: str, data_ini: date, data_fim: date
 ) -> str:
-    """Grava data_ini e data_fim na aba CONFIGURACAO da planilha. Retorna '' em sucesso."""
-    st.session_state["_comm_client_id"] = client_id
+    """Grava data_ini e data_fim no Google Sheets (acessível a todos sem auth Microsoft). Retorna '' em sucesso."""
     try:
-        token             = _ms_token()
-        drive_id, item_id = _resolve_file(token, sharing_url)
-
-        try:
-            ws_id = _find_ws_id(token, drive_id, item_id, _ABA_CONFIGURACAO)
-        except Exception:
-            r = requests.post(
-                f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}"
-                f"/workbook/worksheets",
-                headers={"Authorization": f"Bearer {token}",
-                         "Content-Type": "application/json"},
-                json={"name": _ABA_CONFIGURACAO},
-                timeout=20,
-            )
-            r.raise_for_status()
-            ws_id = r.json()["id"]
-            st.session_state.pop(f"_comm_ws_{item_id}_{_ABA_CONFIGURACAO}", None)
-
-        valores = [
-            ["chave",        "valor"],
-            ["periodo_ini",  data_ini.isoformat()],
-            ["periodo_fim",  data_fim.isoformat()],
-        ]
-        r = requests.patch(
-            f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}"
-            f"/workbook/worksheets/{_url_quote(ws_id)}/range(address='A1:B3')",
-            headers={"Authorization": f"Bearer {token}",
-                     "Content-Type": "application/json"},
-            json={"values": valores},
-            timeout=20,
-        )
-        r.raise_for_status()
-
+        _gs_save_periodo(data_ini, data_fim)
         st.session_state.pop("_comm_periodo_fechamento", None)
         st.session_state.pop("_comm_ts_periodo", None)
         return ""
