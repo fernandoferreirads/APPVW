@@ -1784,8 +1784,38 @@ with _tab_com:
         _render_comm(az_client_id, excel_url)
 
 with _tab_graf:
-    from graficos import render_graficos as _render_graf
-    _render_graf(az_client_id, excel_url)
+    if not st.session_state.get("_graf_autenticado"):
+        st.markdown(
+            "<p style='font-size:1.1rem;font-weight:700;color:#001e50;"
+            "margin-bottom:1rem'>🔒 Área Restrita — Gráficos</p>",
+            unsafe_allow_html=True,
+        )
+        with st.container(border=True):
+            _senha_digitada_g = st.text_input(
+                "Senha de acesso",
+                type="password",
+                key="input_senha_graf",
+                placeholder="Digite a senha...",
+            )
+            if st.button("🔓 Entrar", key="btn_senha_graf", use_container_width=True):
+                try:
+                    _senha_correta_g = st.secrets["SENHA_COMISSAO"]
+                except Exception:
+                    st.error("⚠️ Senha não configurada. Adicione SENHA_COMISSAO nos Secrets do Streamlit.")
+                    _senha_correta_g = None
+                if _senha_correta_g and _senha_digitada_g == _senha_correta_g:
+                    st.session_state["_graf_autenticado"] = True
+                    st.rerun()
+                elif _senha_correta_g:
+                    st.error("❌ Senha incorreta.")
+    else:
+        _col_graf, _col_lock_g = st.columns([10, 1])
+        with _col_lock_g:
+            if st.button("🔒", key="btn_travar_graf", help="Travar acesso aos Gráficos"):
+                st.session_state.pop("_graf_autenticado", None)
+                st.rerun()
+        from graficos import render_graficos as _render_graf
+        _render_graf(az_client_id, excel_url)
 
 with _tab_vend:
     _render_vend(az_client_id, excel_url)
