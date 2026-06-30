@@ -560,10 +560,17 @@ def filter_records(
         ]
 
     if vendedor and "vendedor" in result.columns:
-        vup    = vendedor.upper().strip()
-        result = result[
-            result["vendedor"].fillna("").str.upper().str.contains(vup, regex=False)
-        ]
+        vup_tokens = set(vendedor.upper().strip().split())
+        def _vend_match(name: str) -> bool:
+            n = name.upper().strip()
+            if not n:
+                return False
+            # Match exato/contém (caso normal: admin seleciona nome do BIGBASE)
+            if vendedor.upper().strip() in n or n in vendedor.upper().strip():
+                return True
+            # Match por tokens: nome curto do BIGBASE é subconjunto do nome completo
+            return set(n.split()).issubset(vup_tokens)
+        result = result[result["vendedor"].fillna("").apply(_vend_match)]
 
     return result.reset_index(drop=True)
 
