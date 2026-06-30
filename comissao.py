@@ -693,13 +693,26 @@ def calc_commission(df: pd.DataFrame) -> dict:
 
     total_comissao = sum(r["total"] for r in resultados)
 
+    total_pontos = 0.0
+    if "pontos" in df.columns:
+        ps = pd.to_numeric(
+            df["pontos"].astype(str).str.replace(",", ".", regex=False),
+            errors="coerce",
+        ).fillna(0.0)
+        total_pontos = float(ps.sum())
+
+    total_contratos = len(df)
+    media_pontos = total_pontos / total_contratos if total_contratos > 0 else 0.0
+
     return {
         "por_produto":      resultados,
-        "total_contratos":  len(df),
+        "total_contratos":  total_contratos,
         "total_produtos":   sum(r["qtd"] for r in resultados),
-        "total_comissao":   total_comissao,           # só produtos
-        "total_retorno":    total_retorno,             # só retorno de financiamento
-        "total_bruto":      total_comissao + total_retorno,  # produtos + retorno
+        "total_comissao":   total_comissao,
+        "total_retorno":    total_retorno,
+        "total_bruto":      total_comissao + total_retorno,
+        "total_pontos":     total_pontos,
+        "media_pontos":     media_pontos,
     }
 
 
@@ -1163,6 +1176,23 @@ def _render_kpis(summary: dict) -> None:
             </div>""", unsafe_allow_html=True)
 
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
+    # ── Linha de pontos ───────────────────────────────────────────────────────
+    p1, p2 = st.columns(2)
+    with p1:
+        st.markdown(f"""
+        <div class="comm-card">
+            <div class="label">⭐ Total de Pontos Produzidos</div>
+            <div class="value">{summary.get('total_pontos', 0.0):,.1f}</div>
+        </div>""", unsafe_allow_html=True)
+    with p2:
+        st.markdown(f"""
+        <div class="comm-card">
+            <div class="label">📊 Média de Pontos por Contrato</div>
+            <div class="value">{summary.get('media_pontos', 0.0):,.2f}</div>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
     # ── Linha final: contadores operacionais ──────────────────────────────────
     with st.container(border=True):
