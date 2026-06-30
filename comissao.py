@@ -1332,6 +1332,9 @@ def _render_contratos_ob(df_ob: pd.DataFrame) -> None:
 
 def _zebra(df: pd.DataFrame):
     """Aplica zebra striping (linhas alternadas) a um DataFrame."""
+    df = df.copy()
+    for col in df.select_dtypes(include="object").columns:
+        df[col] = df[col].fillna("").astype(str).str.replace(r"^nan$", "", regex=True)
     return df.style.apply(
         lambda row: [
             "background-color: #EEF2FA" if row.name % 2 == 0 else ""
