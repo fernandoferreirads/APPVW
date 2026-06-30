@@ -1186,10 +1186,17 @@ def _render_kpis(summary: dict) -> None:
             <div class="value">{summary.get('total_pontos', 0.0):,.1f}</div>
         </div>""", unsafe_allow_html=True)
     with p2:
+        _mp = summary.get("media_pontos", 0.0)
+        if _mp >= 1.50:
+            _mp_bg, _mp_border, _mp_color = "#dcfce7", "#86efac", "#166534"
+        elif _mp >= 1.30:
+            _mp_bg, _mp_border, _mp_color = "#fef9c3", "#fde047", "#92400e"
+        else:
+            _mp_bg, _mp_border, _mp_color = "#fde8ea", "#fca5a5", "#991b1b"
         st.markdown(f"""
-        <div class="comm-card">
+        <div class="comm-card" style="background:{_mp_bg};border-color:{_mp_border}">
             <div class="label">📊 Média de Pontos por Contrato</div>
-            <div class="value">{summary.get('media_pontos', 0.0):,.2f}</div>
+            <div class="value" style="color:{_mp_color}">{_mp:,.2f}</div>
         </div>""", unsafe_allow_html=True)
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
