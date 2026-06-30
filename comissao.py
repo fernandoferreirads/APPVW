@@ -1297,7 +1297,18 @@ def _render_contratos_ob(df_ob: pd.DataFrame) -> None:
             )
 
     display.columns = [c.replace("_", " ").upper() for c in display.columns]
-    st.dataframe(display, use_container_width=True, hide_index=True)
+    st.dataframe(_zebra(display), use_container_width=True, hide_index=True)
+
+
+def _zebra(df: pd.DataFrame):
+    """Aplica zebra striping (linhas alternadas) a um DataFrame."""
+    return df.style.apply(
+        lambda row: [
+            "background-color: #EEF2FA" if row.name % 2 == 0 else ""
+            for _ in row
+        ],
+        axis=1,
+    )
 
 
 def _render_contratos(df_filtrado: pd.DataFrame) -> None:
@@ -1317,7 +1328,7 @@ def _render_contratos(df_filtrado: pd.DataFrame) -> None:
         )
 
     display.columns = [c.replace("_", " ").upper() for c in display.columns]
-    st.dataframe(display, use_container_width=True, hide_index=True)
+    st.dataframe(_zebra(display), use_container_width=True, hide_index=True)
 
 
 # ─── Entry point ──────────────────────────────────────────────────────────────
