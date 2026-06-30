@@ -18,6 +18,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from comissao import load_bigbase
+from constants import MESES_PT as _MESES_PT
 
 # ─── Persistência AAK ────────────────────────────────────────────────────────
 _AAK_FILE = Path(__file__).parent / "credentials" / "aak_data.json"
@@ -36,13 +37,6 @@ _AAK_DEFAULTS: dict[str, int] = {
 # ─── Paleta fiel ao Excel ──────────────────────────────────────────────────────
 _AZUL_NV    = "#4472C4"   # azul Excel (barras principais)
 _LARANJA_SN = "#ED7D31"   # laranja Excel (SN / linha AAK / barra tendência)
-_VW_BLUE    = "#001E50"
-
-_MESES_PT = {
-    1: "JANEIRO", 2: "FEVEREIRO", 3: "MARÇO",    4: "ABRIL",
-    5: "MAIO",    6: "JUNHO",     7: "JULHO",     8: "AGOSTO",
-    9: "SETEMBRO",10: "OUTUBRO",  11: "NOVEMBRO", 12: "DEZEMBRO",
-}
 
 # ─── Helpers de data ──────────────────────────────────────────────────────────
 

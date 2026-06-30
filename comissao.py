@@ -27,6 +27,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import requests
 import streamlit as st
+from constants import COLOR_PALETTE as _PALETTE
 
 
 # ─── Tabela de Comissões (única fonte de verdade) ─────────────────────────────
@@ -170,7 +171,6 @@ def _build_bigbase_df(values: list[list]) -> pd.DataFrame:
 
 _BIGBASE_TAB        = "BASE_PAGAMENTOS"
 _ABA_OUTROS_BANCOS  = "OUTROS_BANCOS"
-_ABA_CONFIGURACAO   = "CONFIGURACAO"
 _SPF_FINANCEIRAS_OB = {"BRADESCO", "ITAU", "ITAÚ", "SAFRA", "SANTANDER"}
 _CACHE_TTL          = 300   # segundos (5 min)
 
@@ -704,10 +704,6 @@ def calc_commission(df: pd.DataFrame) -> dict:
 
 
 # ─── Camada de Interface ──────────────────────────────────────────────────────
-
-_VW_BLUE = "#001E50"
-_PALETTE = ["#001E50","#0040B0","#00B0F0","#1EBE5D",
-            "#FF6B35","#9B59B6","#F39C12","#E74C3C"]
 
 
 def _gerar_xlsx(resultado: dict) -> bytes:

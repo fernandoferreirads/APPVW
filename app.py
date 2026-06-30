@@ -24,16 +24,11 @@ from comissao import (
     save_periodo_fechamento,
     render_painel_vendedor as _render_vend,
 )
+from constants import MESES_PT
 
 load_dotenv()
 
 # ─── Mapeamentos ───────────────────────────────────────────────────────────────
-
-MESES_PT = {
-    1: "JANEIRO", 2: "FEVEREIRO", 3: "MARÇO", 4: "ABRIL",
-    5: "MAIO", 6: "JUNHO", 7: "JULHO", 8: "AGOSTO",
-    9: "SETEMBRO", 10: "OUTUBRO", 11: "NOVEMBRO", 12: "DEZEMBRO",
-}
 
 VENDEDOR_EQUIPE = {
     # ── VW SIA ────────────────────────────────────────────────────────────────

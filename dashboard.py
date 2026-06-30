@@ -23,6 +23,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import requests
 import streamlit as st
+from constants import COLOR_PALETTE as _PALETTE, MESES_PT as _MESES_PT, VW_BLUE as _VW_BLUE
 
 # ─── Mapeamento de colunas (header da planilha → nome interno) ────────────────
 
@@ -62,22 +63,11 @@ _COL_MAP: dict[str, str] = {
 
 # ─── Constantes de UI ─────────────────────────────────────────────────────────
 
-_VW_BLUE = "#001E50"
-_PALETTE = [
-    "#001E50", "#0040B0", "#00B0F0", "#1EBE5D",
-    "#FF6B35", "#9B59B6", "#F39C12", "#E74C3C",
-]
 _CHART_LAYOUT = dict(
     template="plotly_white",
     height=320,
     margin=dict(l=10, r=10, t=30, b=10),
 )
-
-_MESES_PT = {
-    1: "JANEIRO", 2: "FEVEREIRO", 3: "MARÇO", 4: "ABRIL",
-    5: "MAIO", 6: "JUNHO", 7: "JULHO", 8: "AGOSTO",
-    9: "SETEMBRO", 10: "OUTUBRO", 11: "NOVEMBRO", 12: "DEZEMBRO",
-}
 
 
 def _nome_aba_atual() -> str:
