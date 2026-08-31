@@ -124,7 +124,7 @@ def _style_ax(ax, title: str):
 
 def _chart_barras_perc(df, col, titulo, cor_barra, filtro="") -> bytes:
     """Barras de quantidade + linha de % penetração."""
-    meses = _ultimos_meses(df, 6)
+    meses = _ultimos_meses(df, 5)
     labels = [r["label"] for r in meses]
     totais = [len(r["df"]) for r in meses]
     qtds   = [_count_col(r["df"], col, filtro) for r in meses]
@@ -160,7 +160,7 @@ def _chart_barras_perc(df, col, titulo, cor_barra, filtro="") -> bytes:
 
 
 def chart_contratos(df: pd.DataFrame) -> bytes:
-    meses = _ultimos_meses(df, 6)
+    meses = _ultimos_meses(df, 5)
     labels = [r["label"] for r in meses]
     nv = [_count_col(r["df"], "tipo_veiculo", "N") for r in meses]
     sn = [_count_col(r["df"], "tipo_veiculo", "S") for r in meses]
@@ -184,7 +184,7 @@ def chart_contratos(df: pd.DataFrame) -> bytes:
 
 
 def chart_total_pontos(df: pd.DataFrame) -> bytes:
-    meses = _ultimos_meses(df, 6)
+    meses = _ultimos_meses(df, 5)
     labels = [r["label"] for r in meses]
     totais = []
     for r in meses:
@@ -207,7 +207,7 @@ def chart_total_pontos(df: pd.DataFrame) -> bytes:
 
 
 def chart_pontos(df: pd.DataFrame) -> bytes:
-    meses = _ultimos_meses(df, 6)
+    meses = _ultimos_meses(df, 5)
     labels = [r["label"] for r in meses]
     medias = []
     for r in meses:
@@ -240,7 +240,7 @@ def chart_seguros(df: pd.DataFrame) -> bytes:
 
 
 def chart_spf(df: pd.DataFrame) -> bytes:
-    meses = _ultimos_meses(df, 6)
+    meses = _ultimos_meses(df, 5)
     labels = [r["label"] for r in meses]
     total  = [_count_col(r["df"], "spf") for r in meses]
     plus   = [_count_col(r["df"], "spf", "PLUS") for r in meses]
