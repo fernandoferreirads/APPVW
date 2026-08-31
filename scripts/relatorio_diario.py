@@ -149,7 +149,7 @@ def _chart_barras_perc(df, col, titulo, cor_barra, filtro="") -> bytes:
 
     bars = ax1.bar(range(len(labels)), qtds, color=cor_barra, zorder=3, alpha=0.85)
     ax2.plot(range(len(labels)), percs, color=LARANJA, linewidth=2,
-             marker="o", markersize=5, label="% Penetração", zorder=4)
+             marker="o", markersize=5, label="% AAK", zorder=4)
 
     for bar, v in zip(bars, qtds):
         if v > 0:
@@ -163,7 +163,7 @@ def _chart_barras_perc(df, col, titulo, cor_barra, filtro="") -> bytes:
     ax1.set_xticks(range(len(labels)))
     ax1.set_xticklabels(labels)
     ax1.set_ylabel("Quantidade", fontsize=9, color=VW_BLUE)
-    ax2.set_ylabel("% Penetração", fontsize=9, color=LARANJA)
+    ax2.set_ylabel("% AAK", fontsize=9, color=LARANJA)
     ax2.tick_params(colors=LARANJA, labelsize=8)
     ax2.spines["top"].set_visible(False)
     ax2.legend(fontsize=8, loc="upper left")
@@ -237,7 +237,7 @@ def chart_contratos_aak(df: pd.DataFrame) -> bytes:
                      fontsize=8, color=LARANJA, fontweight="bold")
 
     ax2.plot(range(len(labels)), penet, color=VERDE, linewidth=2,
-             marker="o", markersize=5, linestyle="--", label="Penetração NV/AAK", zorder=5)
+             marker="o", markersize=5, linestyle="--", label="PENETRATION", zorder=5)
     for i, p in enumerate(penet):
         if p > 0:
             ax2.text(i, p + 0.8, f"{p:.0f}%", ha="center", va="bottom",
@@ -246,7 +246,7 @@ def chart_contratos_aak(df: pd.DataFrame) -> bytes:
     ax1.set_xticks(range(len(labels)))
     ax1.set_xticklabels(labels)
     ax1.set_ylabel("Quantidade", fontsize=9, color=VW_BLUE)
-    ax2.set_ylabel("Penetração NV/AAK (%)", fontsize=9, color=VERDE)
+    ax2.set_ylabel("PENETRATION (%)", fontsize=9, color=VERDE)
     ax2.tick_params(colors=VERDE, labelsize=8)
     ax2.spines["top"].set_visible(False)
 
