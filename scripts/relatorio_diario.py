@@ -22,10 +22,10 @@ GMAIL_FROM    = os.environ["GMAIL_EMAIL"]
 GMAIL_PASS    = os.environ["GMAIL_APP_PASSWORD"]
 EMAIL_TO      = os.environ.get("EMAIL_TO", "ib.rec17@brasal.com.br")
 
-VW_BLUE  = "#001E50"
-AZUL_NV  = "#4472C4"
-LARANJA  = "#ED7D31"
-VERDE    = "#1EBE5D"
+VW_BLUE   = "#001E50"
+AZUL_NV   = "#4472C4"
+AZUL_ESC  = "#2B4F9E"   # azul escuro para segunda série
+LARANJA   = "#ED7D31"   # apenas para linhas de %/meta
 MESES_PT = {1:"JAN",2:"FEV",3:"MAR",4:"ABR",5:"MAI",6:"JUN",
             7:"JUL",8:"AGO",9:"SET",10:"OUT",11:"NOV",12:"DEZ"}
 
@@ -168,7 +168,7 @@ def chart_contratos(df: pd.DataFrame) -> bytes:
     fig, ax = plt.subplots(figsize=(10, 4))
     x = range(len(labels))
     b1 = ax.bar([i - 0.2 for i in x], nv, 0.38, label="Novo (NV)", color=AZUL_NV)
-    b2 = ax.bar([i + 0.2 for i in x], sn, 0.38, label="Semi-Novo (SN)", color=LARANJA)
+    b2 = ax.bar([i + 0.2 for i in x], sn, 0.38, label="Semi-Novo (SN)", color=AZUL_ESC)
     for bar in list(b1) + list(b2):
         h = bar.get_height()
         if h > 0:
@@ -214,9 +214,8 @@ def chart_pontos(df: pd.DataFrame) -> bytes:
         s = r["df"]
         medias.append(round(s["pontos"].sum() / len(s), 2) if len(s) > 0 and "pontos" in s.columns else 0)
 
-    cores = [("#1A5C38" if v >= 1.5 else ("#92400e" if v >= 1.3 else "#991b1b")) for v in medias]
     fig, ax = plt.subplots(figsize=(10, 4))
-    bars = ax.bar(range(len(labels)), medias, color=cores, zorder=3)
+    bars = ax.bar(range(len(labels)), medias, color=AZUL_NV, zorder=3)
     ax.axhline(1.5, color="red", linewidth=1.5, linestyle="--", label="Meta: 1,50", zorder=4)
     for bar, v in zip(bars, medias):
         if v > 0:
@@ -236,7 +235,7 @@ def chart_garantias(df: pd.DataFrame) -> bytes:
 
 
 def chart_seguros(df: pd.DataFrame) -> bytes:
-    return _chart_barras_perc(df, "app", "SEGUROS (AP) — Quantidade e % Penetração", "#6366F1")
+    return _chart_barras_perc(df, "app", "SEGUROS (AP) — Quantidade e % Penetração", AZUL_NV)
 
 
 def chart_spf(df: pd.DataFrame) -> bytes:
@@ -247,8 +246,8 @@ def chart_spf(df: pd.DataFrame) -> bytes:
 
     fig, ax = plt.subplots(figsize=(10, 4))
     x = range(len(labels))
-    b1 = ax.bar([i - 0.2 for i in x], total, 0.38, label="SPF Total", color=VERDE)
-    b2 = ax.bar([i + 0.2 for i in x], plus,  0.38, label="SPF Plus",  color="#0F6E56")
+    b1 = ax.bar([i - 0.2 for i in x], total, 0.38, label="SPF Total", color=AZUL_NV)
+    b2 = ax.bar([i + 0.2 for i in x], plus,  0.38, label="SPF Plus",  color=AZUL_ESC)
     for bar in list(b1) + list(b2):
         h = bar.get_height()
         if h > 0:
@@ -264,11 +263,11 @@ def chart_spf(df: pd.DataFrame) -> bytes:
 
 
 def chart_protege(df: pd.DataFrame) -> bytes:
-    return _chart_barras_perc(df, "protege", "PROTEGE — Quantidade e % Penetração", "#8B5CF6")
+    return _chart_barras_perc(df, "protege", "PROTEGE — Quantidade e % Penetração", AZUL_NV)
 
 
 def chart_sempre_novo(df: pd.DataFrame) -> bytes:
-    return _chart_barras_perc(df, "sempre_novo", "SEMPRE NOVO — Quantidade e % Penetração", "#0EA5E9")
+    return _chart_barras_perc(df, "sempre_novo", "SEMPRE NOVO — Quantidade e % Penetração", AZUL_NV)
 
 
 # ─── Resumo do dia anterior ───────────────────────────────────────────────────
