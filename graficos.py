@@ -196,7 +196,7 @@ def _chart_contratos_nv_sn(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
 # ─── Gráfico 7 — Contratos + AAK ─────────────────────────────────────────────
 
 # Número de meses exibidos no gráfico (completos + mês vigente)
-_AAK_N_MESES = 9   # 8 completos + mês atual → abrange ~out/25 – jun/26
+_AAK_N_MESES = 5   # 4 completos + mês atual
 
 def _chart_contratos_aak(
     df: pd.DataFrame,
