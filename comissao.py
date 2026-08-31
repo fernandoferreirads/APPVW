@@ -448,7 +448,12 @@ def load_bigbase(client_id: str, sharing_url: str) -> tuple[pd.DataFrame | None,
 
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else 0
+        # Limpa caches de sessão/arquivo para que a próxima tentativa recomece do zero
+        for k in list(st.session_state.keys()):
+            if k.startswith(("_comm_file_", "_comm_ws_", "_xl_sess_")):
+                del st.session_state[k]
         msgs   = {
+            400: "❌ Sessão do Excel expirada (400). Clique em 'Tentar novamente'.",
             401: "❌ Token expirado. Reconecte sua conta Microsoft nas Configurações.",
             403: "❌ Sem permissão de acesso ao arquivo (403).",
             404: "❌ Arquivo não encontrado (404). Verifique o link do OneDrive.",
