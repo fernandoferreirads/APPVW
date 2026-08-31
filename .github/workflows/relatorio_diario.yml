@@ -33,8 +33,3 @@ jobs:
           EMAIL_TO:           ib.rec17@brasal.com.br
         run: python scripts/relatorio_diario.py
 
-      - name: Atualizar refresh token se renovado
-        if: env.NEW_REFRESH_TOKEN != ''
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: echo "$NEW_REFRESH_TOKEN" | gh secret set MS_REFRESH_TOKEN
