@@ -80,13 +80,17 @@ def load_bigbase(excel_bytes: bytes) -> pd.DataFrame:
 
 # ─── Helpers de período ───────────────────────────────────────────────────────
 def _ultimos_meses(df: pd.DataFrame, n: int = 6) -> list[dict]:
+    """n-1 meses completos + mês vigente."""
     hoje = date.today()
     result = []
-    for i in range(n, 0, -1):
-        pivot = date(hoje.year, hoje.month, 1)
-        for _ in range(i):
-            pivot = date(pivot.year, pivot.month, 1) - timedelta(days=1)
-        y, m = pivot.year, pivot.month
+    for i in range(n - 1, -1, -1):
+        if i == 0:
+            y, m = hoje.year, hoje.month
+        else:
+            pivot = date(hoje.year, hoje.month, 1)
+            for _ in range(i):
+                pivot = date(pivot.year, pivot.month, 1) - timedelta(days=1)
+            y, m = pivot.year, pivot.month
         sub = df[(df["data_pagto"].dt.year == y) & (df["data_pagto"].dt.month == m)]
         result.append({"label": f"{MESES_PT[m]}/{str(y)[2:]}", "df": sub})
     return result
