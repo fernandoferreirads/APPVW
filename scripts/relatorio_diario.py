@@ -368,20 +368,6 @@ def build_email(charts: dict, r: dict) -> MIMEMultipart:
       </div>
     </div>
 
-    <div style="display:flex;gap:20px;flex-wrap:wrap">
-      <div style="flex:1;min-width:200px">
-        <p style="color:#374A6B;font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin:0 0 8px">Produtos</p>
-        <table style="width:100%;border-collapse:collapse;background:#F8FAFF;border-radius:8px;overflow:hidden;font-size:13px">
-          {tabela_rows(r['produtos'])}
-        </table>
-      </div>
-      <div style="flex:1;min-width:200px">
-        <p style="color:#374A6B;font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin:0 0 8px">Vendedores</p>
-        <table style="width:100%;border-collapse:collapse;background:#F8FAFF;border-radius:8px;overflow:hidden;font-size:13px">
-          {tabela_rows(r['vendedores'])}
-        </table>
-      </div>
-    </div>
   </div>
 
   <div style="background:white;padding:24px 30px;border:1px solid #DDE3EF;border-top:none">
