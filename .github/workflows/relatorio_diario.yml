@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      secrets: write           # necessário para renovar o MS_REFRESH_TOKEN
 
     steps:
       - name: Checkout
