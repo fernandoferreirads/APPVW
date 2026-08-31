@@ -1,0 +1,41 @@
+name: Relatório Diário de Produção
+
+on:
+  schedule:
+    - cron: '0 10 * * 1-5'   # 07:00 BRT (10:00 UTC), segunda a sexta
+  workflow_dispatch:           # permite disparo manual pelo GitHub
+
+jobs:
+  relatorio:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      secrets: write           # necessário para renovar o MS_REFRESH_TOKEN
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: pip install requests pandas openpyxl matplotlib --quiet
+
+      - name: Executar relatório
+        env:
+          MS_CLIENT_ID:       ${{ secrets.MS_CLIENT_ID }}
+          MS_REFRESH_TOKEN:   ${{ secrets.MS_REFRESH_TOKEN }}
+          MS_EXCEL_URL:       ${{ secrets.MS_EXCEL_URL }}
+          GMAIL_EMAIL:        ${{ secrets.GMAIL_EMAIL }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_TO:           ib.rec17@brasal.com.br
+        run: python scripts/relatorio_diario.py
+
+      - name: Atualizar refresh token se renovado
+        if: env.NEW_REFRESH_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$NEW_REFRESH_TOKEN" | gh secret set MS_REFRESH_TOKEN
