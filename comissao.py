@@ -1439,7 +1439,7 @@ def render_comissao(client_id: str = "", sharing_url: str = "") -> None:
             )
         with col_vend:
             vendedores_disp = (
-                sorted(df_base["vendedor"].dropna().str.strip().unique())
+                sorted(df_base["vendedor"].dropna().astype(str).str.strip().unique())
                 if "vendedor" in df_base.columns else []
             )
             vendedor_sel = st.selectbox(
@@ -1505,7 +1505,7 @@ def render_comissao(client_id: str = "", sharing_url: str = "") -> None:
             col_eq, col_eq1, col_eq2, col_eq_btn = st.columns([2, 2, 2, 1])
             with col_eq:
                 _equipes_disp = (
-                    sorted(df_base["equipe"].dropna().str.strip().str.upper().unique())
+                    sorted(df_base["equipe"].dropna().astype(str).str.strip().str.upper().unique())
                     if "equipe" in df_base.columns else []
                 )
                 equipe_sel_eq = st.selectbox(
@@ -1548,7 +1548,7 @@ def render_comissao(client_id: str = "", sharing_url: str = "") -> None:
                     == equipe_sel_eq.upper()
                 )
                 vendedores_eq = sorted(
-                    df_base[mask_eq]["vendedor"].dropna().str.strip().unique()
+                    df_base[mask_eq]["vendedor"].dropna().astype(str).str.strip().unique()
                 ) if "equipe" in df_base.columns else []
 
                 if not vendedores_eq:
