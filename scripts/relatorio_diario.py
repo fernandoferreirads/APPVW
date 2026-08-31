@@ -177,7 +177,7 @@ def chart_contratos(df: pd.DataFrame) -> bytes:
     ax.set_xticks(list(x))
     ax.set_xticklabels(labels)
     ax.legend(fontsize=9)
-    _style_ax(ax, "CONTRATOS — NV vs SN (últimos 6 meses)")
+    _style_ax(ax, "CONTRATOS")
     fig.patch.set_facecolor("white")
     fig.tight_layout()
     return _fig_bytes(fig)
@@ -200,7 +200,7 @@ def chart_total_pontos(df: pd.DataFrame) -> bytes:
                     fontsize=9, fontweight="bold")
     ax.set_xticks(range(len(labels)))
     ax.set_xticklabels(labels)
-    _style_ax(ax, "TOTAL DE PONTOS — Soma mensal")
+    _style_ax(ax, "TOTAL PONTOS")
     fig.patch.set_facecolor("white")
     fig.tight_layout()
     return _fig_bytes(fig)
@@ -224,18 +224,18 @@ def chart_pontos(df: pd.DataFrame) -> bytes:
     ax.set_xticks(range(len(labels)))
     ax.set_xticklabels(labels)
     ax.legend(fontsize=9)
-    _style_ax(ax, "PONTOS POR CONTRATO — Média mensal vs Meta 1,50")
+    _style_ax(ax, "PONTOS POR CONTRATO")
     fig.patch.set_facecolor("white")
     fig.tight_layout()
     return _fig_bytes(fig)
 
 
 def chart_garantias(df: pd.DataFrame) -> bytes:
-    return _chart_barras_perc(df, "ge", "GARANTIAS ESTENDIDAS — Quantidade e % Penetração", AZUL_NV)
+    return _chart_barras_perc(df, "ge", "GARANTIAS", AZUL_NV)
 
 
 def chart_seguros(df: pd.DataFrame) -> bytes:
-    return _chart_barras_perc(df, "app", "SEGUROS (AP) — Quantidade e % Penetração", AZUL_NV)
+    return _chart_barras_perc(df, "app", "SEGUROS", AZUL_NV)
 
 
 def chart_spf(df: pd.DataFrame) -> bytes:
@@ -256,18 +256,18 @@ def chart_spf(df: pd.DataFrame) -> bytes:
     ax.set_xticks(list(x))
     ax.set_xticklabels(labels)
     ax.legend(fontsize=9)
-    _style_ax(ax, "SPF — Total vs Plus (últimos 6 meses)")
+    _style_ax(ax, "SPF")
     fig.patch.set_facecolor("white")
     fig.tight_layout()
     return _fig_bytes(fig)
 
 
 def chart_protege(df: pd.DataFrame) -> bytes:
-    return _chart_barras_perc(df, "protege", "PROTEGE — Quantidade e % Penetração", AZUL_NV)
+    return _chart_barras_perc(df, "protege", "PROTEGE", AZUL_NV)
 
 
 def chart_sempre_novo(df: pd.DataFrame) -> bytes:
-    return _chart_barras_perc(df, "sempre_novo", "SEMPRE NOVO — Quantidade e % Penetração", AZUL_NV)
+    return _chart_barras_perc(df, "sempre_novo", "SEMPRE NOVO", AZUL_NV)
 
 
 # ─── Resumo do dia anterior ───────────────────────────────────────────────────
