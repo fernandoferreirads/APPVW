@@ -137,17 +137,22 @@ def _style_ax(ax, title: str):
 
 
 def _chart_barras_perc(df, col, titulo, cor_barra, filtro="") -> bytes:
-    """Barras de quantidade + linha de % penetração."""
-    meses = _ultimos_meses(df, 5)
+    """Barras de quantidade (eixo esq.) + linha % AAK (eixo dir. com escala %)."""
+    meses  = _ultimos_meses(df, 5)
     labels = [r["label"] for r in meses]
     totais = [len(r["df"]) for r in meses]
     qtds   = [_count_col(r["df"], col, filtro) for r in meses]
     percs  = [round(q / t * 100, 1) if t > 0 else 0 for q, t in zip(qtds, totais)]
 
+    # eixo esquerdo: teto = max bars * 1.35 (dá espaço aos rótulos)
+    y_left_max = max(max(qtds, default=0) * 1.35, 50)
+    # eixo direito: 0–120% (igual ao app — linha nunca ultrapassa as barras)
+    y_right_max = 120
+
     fig, ax1 = plt.subplots(figsize=(10, 4))
     ax2 = ax1.twinx()
 
-    bars = ax1.bar(range(len(labels)), qtds, color=cor_barra, zorder=3, alpha=0.85)
+    bars = ax1.bar(range(len(labels)), qtds, color=cor_barra, zorder=3, alpha=0.85, label="Qtd")
     ax2.plot(range(len(labels)), percs, color=LARANJA, linewidth=2,
              marker="o", markersize=5, label="% AAK", zorder=4)
 
@@ -160,13 +165,21 @@ def _chart_barras_perc(df, col, titulo, cor_barra, filtro="") -> bytes:
             ax2.text(i, p + 0.8, f"{p:.0f}%",
                      ha="center", va="bottom", fontsize=8, color=LARANJA, fontweight="bold")
 
+    ax1.set_ylim(0, y_left_max)
+    ax2.set_ylim(0, y_right_max)
     ax1.set_xticks(range(len(labels)))
     ax1.set_xticklabels(labels)
     ax1.set_ylabel("Quantidade", fontsize=9, color=VW_BLUE)
     ax2.set_ylabel("% AAK", fontsize=9, color=LARANJA)
+    ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{x:.0f}%"))
     ax2.tick_params(colors=LARANJA, labelsize=8)
     ax2.spines["top"].set_visible(False)
-    ax2.legend(fontsize=8, loc="upper left")
+    ax2.grid(False)
+
+    lines1, lbs1 = ax1.get_legend_handles_labels()
+    lines2, lbs2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, lbs1 + lbs2, fontsize=8, loc="upper left")
+
     _style_ax(ax1, titulo)
     fig.patch.set_facecolor("white")
     fig.tight_layout()
