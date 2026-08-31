@@ -29,6 +29,16 @@ LARANJA   = "#ED7D31"   # apenas para linhas de %/meta
 MESES_PT = {1:"JAN",2:"FEV",3:"MAR",4:"ABR",5:"MAI",6:"JUN",
             7:"JUL",8:"AGO",9:"SET",10:"OUT",11:"NOV",12:"DEZ"}
 
+_AAK_DEFAULTS: dict[str, int] = {
+    "2025-10": 192,
+    "2025-11": 186,
+    "2025-12": 181,
+    "2026-01": 207,
+    "2026-02": 195,
+    "2026-03": 231,
+    "2026-04": 214,
+}
+
 
 # ─── Auth Microsoft Graph ─────────────────────────────────────────────────────
 def get_access_token() -> tuple[str, str]:
@@ -183,6 +193,69 @@ def chart_contratos(df: pd.DataFrame) -> bytes:
     return _fig_bytes(fig)
 
 
+def chart_contratos_aak(df: pd.DataFrame) -> bytes:
+    """Barras TT (azul) + linha AAK (laranja, eixo esq.) + linha PENETRATION NV/AAK (verde, eixo dir.)."""
+    hoje = date.today()
+    labels, periodos, nv_vals, tt_vals = [], [], [], []
+    for i in range(4, -1, -1):
+        if i == 0:
+            y, m = hoje.year, hoje.month
+        else:
+            pivot = date(hoje.year, hoje.month, 1)
+            for _ in range(i):
+                pivot = date(pivot.year, pivot.month, 1) - timedelta(days=1)
+            y, m = pivot.year, pivot.month
+        sub = df[(df["data_pagto"].dt.year == y) & (df["data_pagto"].dt.month == m)]
+        labels.append(f"{MESES_PT[m]}/{str(y)[2:]}")
+        periodos.append(f"{y:04d}-{m:02d}")
+        nv_vals.append(_count_col(sub, "tipo_veiculo", "N"))
+        tt_vals.append(len(sub))
+
+    aak_vals = [_AAK_DEFAULTS.get(p, 0) for p in periodos]
+    penet    = [round(nv / aak * 100, 1) if aak > 0 else 0.0
+                for nv, aak in zip(nv_vals, aak_vals)]
+
+    VERDE = "#70AD47"
+    fig, ax1 = plt.subplots(figsize=(10, 4))
+    ax2 = ax1.twinx()
+
+    bars = ax1.bar(range(len(labels)), tt_vals, color=AZUL_NV, zorder=3, alpha=0.85, label="Contratos TT")
+    for bar, v in zip(bars, tt_vals):
+        if v > 0:
+            ax1.text(bar.get_x() + bar.get_width()/2, v + 0.3, str(v),
+                     ha="center", va="bottom", fontsize=9, fontweight="bold")
+
+    ax1.plot(range(len(labels)), aak_vals, color=LARANJA, linewidth=2,
+             marker="o", markersize=5, label="AAK", zorder=4)
+    for i, v in enumerate(aak_vals):
+        if v > 0:
+            ax1.text(i, v + 1, str(v), ha="center", va="bottom",
+                     fontsize=8, color=LARANJA, fontweight="bold")
+
+    ax2.plot(range(len(labels)), penet, color=VERDE, linewidth=2,
+             marker="o", markersize=5, linestyle="--", label="Penetração NV/AAK", zorder=5)
+    for i, p in enumerate(penet):
+        if p > 0:
+            ax2.text(i, p + 0.8, f"{p:.0f}%", ha="center", va="bottom",
+                     fontsize=8, color=VERDE, fontweight="bold")
+
+    ax1.set_xticks(range(len(labels)))
+    ax1.set_xticklabels(labels)
+    ax1.set_ylabel("Quantidade", fontsize=9, color=VW_BLUE)
+    ax2.set_ylabel("Penetração NV/AAK (%)", fontsize=9, color=VERDE)
+    ax2.tick_params(colors=VERDE, labelsize=8)
+    ax2.spines["top"].set_visible(False)
+
+    lines1, lbs1 = ax1.get_legend_handles_labels()
+    lines2, lbs2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, lbs1 + lbs2, fontsize=8, loc="upper left")
+
+    _style_ax(ax1, "CONTRATOS E AAK")
+    fig.patch.set_facecolor("white")
+    fig.tight_layout()
+    return _fig_bytes(fig)
+
+
 def chart_total_pontos(df: pd.DataFrame) -> bytes:
     meses = _ultimos_meses(df, 5)
     labels = [r["label"] for r in meses]
@@ -303,8 +376,9 @@ def resumo_ontem(df: pd.DataFrame) -> dict:
 
 # ─── Montagem do email ────────────────────────────────────────────────────────
 _CHART_ORDER = [
-    ("chart_contratos",   "CONTRATOS — NV vs SN"),
-    ("chart_total_pontos","TOTAL DE PONTOS"),
+    ("chart_contratos",     "CONTRATOS — NV vs SN"),
+    ("chart_contratos_aak", "CONTRATOS E AAK"),
+    ("chart_total_pontos",  "TOTAL DE PONTOS"),
     ("chart_pontos",      "PONTOS POR CONTRATO vs Meta"),
     ("chart_garantias",   "GARANTIAS ESTENDIDAS"),
     ("chart_seguros",     "SEGUROS (AP)"),
@@ -421,8 +495,9 @@ def main():
 
     print("🎨 Gerando gráficos...")
     charts = {
-        "chart_contratos":    chart_contratos(df),
-        "chart_total_pontos": chart_total_pontos(df),
+        "chart_contratos":     chart_contratos(df),
+        "chart_contratos_aak": chart_contratos_aak(df),
+        "chart_total_pontos":  chart_total_pontos(df),
         "chart_pontos":       chart_pontos(df),
         "chart_garantias":    chart_garantias(df),
         "chart_seguros":      chart_seguros(df),
