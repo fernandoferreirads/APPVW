@@ -25,6 +25,7 @@ EMAIL_TO      = os.environ.get("EMAIL_TO", "ib.rec17@brasal.com.br")
 VW_BLUE  = "#001E50"
 AZUL_NV  = "#4472C4"
 LARANJA  = "#ED7D31"
+VERDE    = "#1EBE5D"
 MESES_PT = {1:"JAN",2:"FEV",3:"MAR",4:"ABR",5:"MAI",6:"JUN",
             7:"JUL",8:"AGO",9:"SET",10:"OUT",11:"NOV",12:"DEZ"}
 
@@ -61,8 +62,8 @@ def download_excel(token: str, sharing_url: str) -> bytes:
 _COLS = {
     0:"proposta", 1:"equipe", 2:"data_pagto", 3:"cpf_cnpj",
     4:"cliente", 8:"spf", 9:"app", 10:"gap", 11:"franquia",
-    13:"ge", 14:"protege", 17:"tipo_veiculo", 20:"vendedor",
-    21:"retorno", 22:"pontos",
+    13:"ge", 14:"protege", 17:"tipo_veiculo", 18:"sempre_novo",
+    20:"vendedor", 21:"retorno", 22:"pontos",
 }
 
 def load_bigbase(excel_bytes: bytes) -> pd.DataFrame:
@@ -91,6 +92,15 @@ def _ultimos_meses(df: pd.DataFrame, n: int = 6) -> list[dict]:
     return result
 
 
+def _count_col(sub: pd.DataFrame, col: str, filtro: str = "") -> int:
+    if col not in sub.columns:
+        return 0
+    s = sub[col].astype(str).str.strip().str.upper()
+    if filtro:
+        return int(s.str.contains(filtro.upper()).sum())
+    return int((s.notna() & (s != "") & (s != "NAN") & (s != "NONE")).sum())
+
+
 # ─── Geração de gráficos ──────────────────────────────────────────────────────
 def _fig_bytes(fig) -> bytes:
     buf = io.BytesIO()
@@ -108,11 +118,48 @@ def _style_ax(ax, title: str):
     ax.tick_params(labelsize=9)
 
 
+def _chart_barras_perc(df, col, titulo, cor_barra, filtro="") -> bytes:
+    """Barras de quantidade + linha de % penetração."""
+    meses = _ultimos_meses(df, 6)
+    labels = [r["label"] for r in meses]
+    totais = [len(r["df"]) for r in meses]
+    qtds   = [_count_col(r["df"], col, filtro) for r in meses]
+    percs  = [round(q / t * 100, 1) if t > 0 else 0 for q, t in zip(qtds, totais)]
+
+    fig, ax1 = plt.subplots(figsize=(10, 4))
+    ax2 = ax1.twinx()
+
+    bars = ax1.bar(range(len(labels)), qtds, color=cor_barra, zorder=3, alpha=0.85)
+    ax2.plot(range(len(labels)), percs, color=LARANJA, linewidth=2,
+             marker="o", markersize=5, label="% Penetração", zorder=4)
+
+    for bar, v in zip(bars, qtds):
+        if v > 0:
+            ax1.text(bar.get_x() + bar.get_width()/2, v + 0.3, str(v),
+                     ha="center", va="bottom", fontsize=9, fontweight="bold")
+    for i, p in enumerate(percs):
+        if p > 0:
+            ax2.text(i, p + 0.8, f"{p:.0f}%",
+                     ha="center", va="bottom", fontsize=8, color=LARANJA, fontweight="bold")
+
+    ax1.set_xticks(range(len(labels)))
+    ax1.set_xticklabels(labels)
+    ax1.set_ylabel("Quantidade", fontsize=9, color=VW_BLUE)
+    ax2.set_ylabel("% Penetração", fontsize=9, color=LARANJA)
+    ax2.tick_params(colors=LARANJA, labelsize=8)
+    ax2.spines["top"].set_visible(False)
+    ax2.legend(fontsize=8, loc="upper left")
+    _style_ax(ax1, titulo)
+    fig.patch.set_facecolor("white")
+    fig.tight_layout()
+    return _fig_bytes(fig)
+
+
 def chart_contratos(df: pd.DataFrame) -> bytes:
     meses = _ultimos_meses(df, 6)
     labels = [r["label"] for r in meses]
-    nv = [len(r["df"][r["df"].get("tipo_veiculo", pd.Series()).astype(str).str.upper().str.startswith("N")]) for r in meses]
-    sn = [len(r["df"][r["df"].get("tipo_veiculo", pd.Series()).astype(str).str.upper().str.startswith("S")]) for r in meses]
+    nv = [_count_col(r["df"], "tipo_veiculo", "N") for r in meses]
+    sn = [_count_col(r["df"], "tipo_veiculo", "S") for r in meses]
 
     fig, ax = plt.subplots(figsize=(10, 4))
     x = range(len(labels))
@@ -127,6 +174,29 @@ def chart_contratos(df: pd.DataFrame) -> bytes:
     ax.set_xticklabels(labels)
     ax.legend(fontsize=9)
     _style_ax(ax, "CONTRATOS — NV vs SN (últimos 6 meses)")
+    fig.patch.set_facecolor("white")
+    fig.tight_layout()
+    return _fig_bytes(fig)
+
+
+def chart_total_pontos(df: pd.DataFrame) -> bytes:
+    meses = _ultimos_meses(df, 6)
+    labels = [r["label"] for r in meses]
+    totais = []
+    for r in meses:
+        s = r["df"]
+        totais.append(round(float(s["pontos"].sum()), 1) if "pontos" in s.columns else 0.0)
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    bars = ax.bar(range(len(labels)), totais, color=AZUL_NV, zorder=3)
+    for bar, v in zip(bars, totais):
+        if v > 0:
+            ax.text(bar.get_x() + bar.get_width()/2, v + 0.5,
+                    f"{v:.1f}".replace(".", ","), ha="center", va="bottom",
+                    fontsize=9, fontweight="bold")
+    ax.set_xticks(range(len(labels)))
+    ax.set_xticklabels(labels)
+    _style_ax(ax, "TOTAL DE PONTOS — Soma mensal")
     fig.patch.set_facecolor("white")
     fig.tight_layout()
     return _fig_bytes(fig)
@@ -158,55 +228,43 @@ def chart_pontos(df: pd.DataFrame) -> bytes:
 
 
 def chart_garantias(df: pd.DataFrame) -> bytes:
-    meses = _ultimos_meses(df, 6)
-    labels = [r["label"] for r in meses]
-    qtds = []
-    for r in meses:
-        s = r["df"]
-        if "ge" not in s.columns:
-            qtds.append(0)
-        else:
-            mask = s["ge"].notna() & (s["ge"].astype(str).str.strip().str.upper() != "")
-            qtds.append(int(mask.sum()))
+    return _chart_barras_perc(df, "ge", "GARANTIAS ESTENDIDAS — Quantidade e % Penetração", AZUL_NV)
 
-    fig, ax = plt.subplots(figsize=(10, 4))
-    bars = ax.bar(range(len(labels)), qtds, color=AZUL_NV, zorder=3)
-    for bar, v in zip(bars, qtds):
-        if v > 0:
-            ax.text(bar.get_x() + bar.get_width()/2, v + 0.2, str(v),
-                    ha="center", va="bottom", fontsize=9, fontweight="bold")
-    ax.set_xticks(range(len(labels)))
-    ax.set_xticklabels(labels)
-    _style_ax(ax, "GARANTIAS ESTENDIDAS — Quantidade mensal")
-    fig.patch.set_facecolor("white")
-    fig.tight_layout()
-    return _fig_bytes(fig)
+
+def chart_seguros(df: pd.DataFrame) -> bytes:
+    return _chart_barras_perc(df, "app", "SEGUROS (AP) — Quantidade e % Penetração", "#6366F1")
 
 
 def chart_spf(df: pd.DataFrame) -> bytes:
     meses = _ultimos_meses(df, 6)
     labels = [r["label"] for r in meses]
-    qtds = []
-    for r in meses:
-        s = r["df"]
-        if "spf" not in s.columns:
-            qtds.append(0)
-        else:
-            mask = s["spf"].notna() & (s["spf"].astype(str).str.strip() != "")
-            qtds.append(int(mask.sum()))
+    total  = [_count_col(r["df"], "spf") for r in meses]
+    plus   = [_count_col(r["df"], "spf", "PLUS") for r in meses]
 
     fig, ax = plt.subplots(figsize=(10, 4))
-    bars = ax.bar(range(len(labels)), qtds, color="#1EBE5D", zorder=3)
-    for bar, v in zip(bars, qtds):
-        if v > 0:
-            ax.text(bar.get_x() + bar.get_width()/2, v + 0.2, str(v),
+    x = range(len(labels))
+    b1 = ax.bar([i - 0.2 for i in x], total, 0.38, label="SPF Total", color=VERDE)
+    b2 = ax.bar([i + 0.2 for i in x], plus,  0.38, label="SPF Plus",  color="#0F6E56")
+    for bar in list(b1) + list(b2):
+        h = bar.get_height()
+        if h > 0:
+            ax.text(bar.get_x() + bar.get_width()/2, h + 0.2, str(int(h)),
                     ha="center", va="bottom", fontsize=9, fontweight="bold")
-    ax.set_xticks(range(len(labels)))
+    ax.set_xticks(list(x))
     ax.set_xticklabels(labels)
-    _style_ax(ax, "SPF — Quantidade mensal")
+    ax.legend(fontsize=9)
+    _style_ax(ax, "SPF — Total vs Plus (últimos 6 meses)")
     fig.patch.set_facecolor("white")
     fig.tight_layout()
     return _fig_bytes(fig)
+
+
+def chart_protege(df: pd.DataFrame) -> bytes:
+    return _chart_barras_perc(df, "protege", "PROTEGE — Quantidade e % Penetração", "#8B5CF6")
+
+
+def chart_sempre_novo(df: pd.DataFrame) -> bytes:
+    return _chart_barras_perc(df, "sempre_novo", "SEMPRE NOVO — Quantidade e % Penetração", "#0EA5E9")
 
 
 # ─── Resumo do dia anterior ───────────────────────────────────────────────────
@@ -219,10 +277,9 @@ def resumo_ontem(df: pd.DataFrame) -> dict:
     media_pts = total_pts / n if n > 0 else 0.0
 
     produtos = {}
-    for col in ["spf", "ap", "gap", "franquia", "ge", "protege"]:
+    for col in ["spf", "app", "gap", "franquia", "ge", "protege", "sempre_novo"]:
         if col in sub.columns:
-            cnt = int(sub[col].notna().sum() -
-                      (sub[col].astype(str).str.strip() == "").sum())
+            cnt = _count_col(sub, col)
             if cnt > 0:
                 produtos[col.upper()] = cnt
 
@@ -242,6 +299,17 @@ def resumo_ontem(df: pd.DataFrame) -> dict:
 
 
 # ─── Montagem do email ────────────────────────────────────────────────────────
+_CHART_ORDER = [
+    ("chart_contratos",   "CONTRATOS — NV vs SN"),
+    ("chart_total_pontos","TOTAL DE PONTOS"),
+    ("chart_pontos",      "PONTOS POR CONTRATO vs Meta"),
+    ("chart_garantias",   "GARANTIAS ESTENDIDAS"),
+    ("chart_seguros",     "SEGUROS (AP)"),
+    ("chart_spf",         "SPF — Total vs Plus"),
+    ("chart_protege",     "PROTEGE"),
+    ("chart_sempre_novo", "SEMPRE NOVO"),
+]
+
 def build_email(charts: dict, r: dict) -> MIMEMultipart:
     msg = MIMEMultipart("related")
     msg["Subject"] = f"📊 Relatório de Produção — {r['data']} | Brasal VW"
@@ -260,6 +328,11 @@ def build_email(charts: dict, r: dict) -> MIMEMultipart:
             f"<td style='padding:5px 12px;font-weight:700;color:#001E50'>{v}</td></tr>"
             for k, v in d.items()
         )
+
+    graficos_html = "\n".join(
+        f'<img src="cid:{cid}" style="width:100%;border-radius:8px;margin-bottom:14px;display:block">'
+        for cid, _ in _CHART_ORDER if cid in charts
+    )
 
     html = f"""
 <html><body style="font-family:Arial,sans-serif;background:#EEF2FA;margin:0;padding:24px">
@@ -311,10 +384,7 @@ def build_email(charts: dict, r: dict) -> MIMEMultipart:
     <p style="color:#374A6B;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin:0 0 16px;font-weight:700">
       Gráficos — Últimos 6 Meses
     </p>
-    <img src="cid:chart_contratos" style="width:100%;border-radius:8px;margin-bottom:14px;display:block">
-    <img src="cid:chart_pontos"    style="width:100%;border-radius:8px;margin-bottom:14px;display:block">
-    <img src="cid:chart_garantias" style="width:100%;border-radius:8px;margin-bottom:14px;display:block">
-    <img src="cid:chart_spf"       style="width:100%;border-radius:8px;display:block">
+    {graficos_html}
   </div>
 
   <div style="background:#001E50;padding:12px 30px;border-radius:0 0 10px 10px;text-align:center">
@@ -328,11 +398,12 @@ def build_email(charts: dict, r: dict) -> MIMEMultipart:
 """
 
     msg.attach(MIMEText(html, "html"))
-    for cid, png in charts.items():
-        img = MIMEImage(png, "png")
-        img.add_header("Content-ID",          f"<{cid}>")
-        img.add_header("Content-Disposition", "inline")
-        msg.attach(img)
+    for cid, _ in _CHART_ORDER:
+        if cid in charts:
+            img = MIMEImage(charts[cid], "png")
+            img.add_header("Content-ID",          f"<{cid}>")
+            img.add_header("Content-Disposition", "inline")
+            msg.attach(img)
 
     return msg
 
@@ -349,7 +420,6 @@ def main():
     token, new_refresh = get_access_token()
 
     if new_refresh != REFRESH_TOKEN:
-        # Escreve na variável de ambiente para o passo seguinte do workflow atualizar o secret
         with open(os.environ.get("GITHUB_ENV", "/dev/null"), "a") as f:
             f.write(f"NEW_REFRESH_TOKEN={new_refresh}\n")
         print("♻️  Refresh token renovado.")
@@ -362,10 +432,14 @@ def main():
 
     print("🎨 Gerando gráficos...")
     charts = {
-        "chart_contratos": chart_contratos(df),
-        "chart_pontos":    chart_pontos(df),
-        "chart_garantias": chart_garantias(df),
-        "chart_spf":       chart_spf(df),
+        "chart_contratos":    chart_contratos(df),
+        "chart_total_pontos": chart_total_pontos(df),
+        "chart_pontos":       chart_pontos(df),
+        "chart_garantias":    chart_garantias(df),
+        "chart_seguros":      chart_seguros(df),
+        "chart_spf":          chart_spf(df),
+        "chart_protege":      chart_protege(df),
+        "chart_sempre_novo":  chart_sempre_novo(df),
     }
 
     resumo = resumo_ontem(df)
