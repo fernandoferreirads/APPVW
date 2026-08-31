@@ -240,76 +240,16 @@ def _ms_token() -> str:
     raise Exception("Não autenticado. Faça login nas Configurações (🔑).")
 
 
-def _resolve_file(token: str, sharing_url: str) -> tuple[str, str]:
-    """Resolve sharing_url → (drive_id, item_id) com cache por URL."""
-    import hashlib
-    url_key   = f"_comm_file_{hashlib.md5(sharing_url.encode()).hexdigest()[:12]}"
-    cached    = st.session_state.get(url_key)
-    if cached:
-        return cached
-
+def _download_excel(token: str, sharing_url: str) -> bytes:
+    """Baixa o arquivo Excel diretamente via shares API (sem sessão de workbook)."""
     encoded = base64.urlsafe_b64encode(sharing_url.encode()).decode().rstrip("=")
     r = requests.get(
-        f"https://graph.microsoft.com/v1.0/shares/u!{encoded}/driveItem",
+        f"https://graph.microsoft.com/v1.0/shares/u!{encoded}/driveItem/content",
         headers={"Authorization": f"Bearer {token}"},
-        timeout=20,
+        timeout=60,
     )
     r.raise_for_status()
-    d = r.json()
-    ids = (d["parentReference"]["driveId"], d["id"])
-    st.session_state[url_key] = ids
-    return ids
-
-
-def _find_ws_id(token: str, drive_id: str, item_id: str, tab_name: str) -> str:
-    """Localiza ws_id pelo nome da aba (case-insensitive fallback)."""
-    cache_key = f"_comm_ws_{item_id}_{tab_name}"
-    cached = st.session_state.get(cache_key)
-    if cached:
-        return cached
-
-    r = requests.get(
-        f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}"
-        f"/workbook/worksheets",
-        headers={"Authorization": f"Bearer {token}"},
-        timeout=20,
-    )
-    r.raise_for_status()
-    sheets = r.json().get("value", [])
-
-    # Tenta match exato, depois case-insensitive
-    ws_id = None
-    for ws in sheets:
-        if ws["name"] == tab_name:
-            ws_id = ws["id"]
-            break
-    if ws_id is None:
-        for ws in sheets:
-            if ws["name"].upper() == tab_name.upper():
-                ws_id = ws["id"]
-                break
-    if ws_id is None:
-        nomes = [ws["name"] for ws in sheets]
-        raise Exception(f"Aba '{tab_name}' não encontrada. Abas disponíveis: {nomes}")
-
-    st.session_state[cache_key] = ws_id
-    return ws_id
-
-
-def _read_range(token: str, drive_id: str, item_id: str, ws_id: str) -> list[list]:
-    """Lê usedRange da aba (reutiliza sessão Excel se ativa)."""
-    hdrs = {"Authorization": f"Bearer {token}"}
-    sess = st.session_state.get(f"_xl_sess_{item_id}", "")
-    if sess:
-        hdrs["workbook-session-id"] = sess
-    r = requests.get(
-        f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}"
-        f"/workbook/worksheets/{_url_quote(ws_id)}/usedRange?$select=values",
-        headers=hdrs,
-        timeout=40,
-    )
-    r.raise_for_status()
-    return r.json().get("values", [])
+    return r.content
 
 
 # ─── Google Sheets — service account (sem auth MSAL) ─────────────────────────
@@ -400,19 +340,19 @@ def load_bigbase(client_id: str, sharing_url: str) -> tuple[pd.DataFrame | None,
         return cached, ""
 
     try:
-        token             = _ms_token()
-        drive_id, item_id = _resolve_file(token, sharing_url)
-        ws_id             = _find_ws_id(token, drive_id, item_id, _BIGBASE_TAB)
-        values            = _read_range(token, drive_id, item_id, ws_id)
+        token        = _ms_token()
+        excel_bytes  = _download_excel(token, sharing_url)
 
-        if not values or len(values) < 2:
-            return None, "⚠️ A aba BIGBASE está vazia ou sem dados suficientes."
+        import io as _io
+        df = pd.read_excel(_io.BytesIO(excel_bytes), sheet_name=_BIGBASE_TAB, header=0)
 
-        # Usa mapeamento por posição (com fallback por nome de cabeçalho)
-        df = _build_bigbase_df(values)
+        # Renomeia colunas por posição usando _BIGBASE_SPEC (name, aliases, fallback_pos)
+        pos_map = {fallback: name for name, _, fallback in _BIGBASE_SPEC if fallback is not None}
+        rename  = {df.columns[i]: name for i, name in pos_map.items() if i < len(df.columns)}
+        df = df.rename(columns=rename)
 
         if df.empty:
-            return None, "⚠️ Não foi possível interpretar as colunas da BIGBASE."
+            return None, "⚠️ A aba BIGBASE está vazia ou sem dados suficientes."
 
         df = df.dropna(how="all")
 
@@ -488,24 +428,28 @@ def load_outros_bancos(client_id: str, sharing_url: str) -> tuple[pd.DataFrame |
                 "n_s", "tipo_retorno", "vendedor", "retorno"]
 
     try:
-        token             = _ms_token()
-        drive_id, item_id = _resolve_file(token, sharing_url)
-        ws_id             = _find_ws_id(token, drive_id, item_id, _ABA_OUTROS_BANCOS)
-        values            = _read_range(token, drive_id, item_id, ws_id)
+        token       = _ms_token()
+        excel_bytes = _download_excel(token, sharing_url)
 
-        if not values or len(values) < 2:
+        import io as _io
+        try:
+            df = pd.read_excel(_io.BytesIO(excel_bytes), sheet_name=_ABA_OUTROS_BANCOS, header=0)
+        except Exception:
             df = pd.DataFrame(columns=_OB_COLS)
             st.session_state[cache_key] = df
             st.session_state[ts_key]    = time.time()
             return df, ""
 
-        records = []
-        for row in values[1:]:
-            record = {col: (row[i] if i < len(row) else None)
-                      for i, col in enumerate(_OB_COLS)}
-            records.append(record)
+        if df.empty:
+            df = pd.DataFrame(columns=_OB_COLS)
+            st.session_state[cache_key] = df
+            st.session_state[ts_key]    = time.time()
+            return df, ""
 
-        df = pd.DataFrame(records).dropna(how="all")
+        # Renomeia colunas pelo índice de posição
+        rename = {df.columns[i]: col for i, col in enumerate(_OB_COLS) if i < len(df.columns)}
+        df = df.rename(columns=rename)
+        df = df.dropna(how="all")
 
         for col in ("retorno", "valor_financiado"):
             if col in df.columns:
