@@ -89,7 +89,11 @@ def load_bigbase(excel_bytes: bytes) -> pd.DataFrame:
         df["pontos"] = pd.to_numeric(
             df["pontos"].astype(str).str.replace(",", ".", regex=False), errors="coerce"
         ).fillna(0.0)
-    return df.dropna(subset=["data_pagto"])
+    df = df.dropna(subset=["data_pagto"])
+    # Só conta como contrato quando a proposta está preenchida
+    prop = df["proposta"].astype(str).str.strip().str.upper()
+    df = df[prop.notna() & (prop != "") & (prop != "NAN") & (prop != "NONE")]
+    return df
 
 
 # ─── Helpers de período ───────────────────────────────────────────────────────
