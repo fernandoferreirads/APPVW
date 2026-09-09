@@ -325,7 +325,7 @@ def chart_garantias(df: pd.DataFrame) -> bytes:
 
 
 def chart_seguros(df: pd.DataFrame) -> bytes:
-    return _chart_barras_perc(df, "app", "SEGUROS", AZUL_NV)
+    return _chart_barras_perc(df, "app", "SEGUROS", AZUL_NV, filtro="SEGURO VW")
 
 
 def chart_spf(df: pd.DataFrame) -> bytes:
