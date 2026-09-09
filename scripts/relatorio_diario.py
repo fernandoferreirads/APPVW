@@ -114,10 +114,12 @@ def _ultimos_meses(df: pd.DataFrame, n: int = 6) -> list[dict]:
     return result
 
 
-def _count_col(sub: pd.DataFrame, col: str, filtro: str = "") -> int:
+def _count_col(sub: pd.DataFrame, col: str, filtro: str = "", valores: list = None) -> int:
     if col not in sub.columns:
         return 0
     s = sub[col].astype(str).str.strip().str.upper()
+    if valores:
+        return int(s.isin([v.upper() for v in valores]).sum())
     if filtro:
         return int(s.str.contains(filtro.upper()).sum())
     return int((s.notna() & (s != "") & (s != "NAN") & (s != "NONE")).sum())
@@ -140,12 +142,12 @@ def _style_ax(ax, title: str):
     ax.tick_params(labelsize=9)
 
 
-def _chart_barras_perc(df, col, titulo, cor_barra, filtro="") -> bytes:
+def _chart_barras_perc(df, col, titulo, cor_barra, filtro="", valores=None) -> bytes:
     """Barras de quantidade (eixo esq.) + linha % AAK (eixo dir. com escala %)."""
     meses  = _ultimos_meses(df, 5)
     labels = [r["label"] for r in meses]
     totais = [len(r["df"]) for r in meses]
-    qtds   = [_count_col(r["df"], col, filtro) for r in meses]
+    qtds   = [_count_col(r["df"], col, filtro, valores) for r in meses]
     percs  = [round(q / t * 100, 1) if t > 0 else 0 for q, t in zip(qtds, totais)]
 
     # eixo esquerdo: teto = max bars * 1.35 (dá espaço aos rótulos)
@@ -325,7 +327,8 @@ def chart_pontos(df: pd.DataFrame) -> bytes:
 
 
 def chart_garantias(df: pd.DataFrame) -> bytes:
-    return _chart_barras_perc(df, "ge", "GARANTIAS", AZUL_NV)
+    return _chart_barras_perc(df, "ge", "GARANTIAS", AZUL_NV,
+                              valores=["GE 1", "GE 2", "GE 3", "GE 4"])
 
 
 def chart_seguros(df: pd.DataFrame) -> bytes:
@@ -335,8 +338,9 @@ def chart_seguros(df: pd.DataFrame) -> bytes:
 def chart_spf(df: pd.DataFrame) -> bytes:
     meses = _ultimos_meses(df, 5)
     labels = [r["label"] for r in meses]
-    total  = [_count_col(r["df"], "spf") for r in meses]
-    plus   = [_count_col(r["df"], "spf", "PLUS") for r in meses]
+    _SPF_VALS = ["SPF PLUS", "SPF BASICO", "SPF NORMAL"]
+    total  = [_count_col(r["df"], "spf", valores=_SPF_VALS) for r in meses]
+    plus   = [_count_col(r["df"], "spf", valores=["SPF PLUS"]) for r in meses]
 
     fig, ax = plt.subplots(figsize=(10, 4))
     x = range(len(labels))
@@ -373,12 +377,22 @@ def resumo_ontem(df: pd.DataFrame) -> dict:
     n = len(sub)
     media_pts = total_pts / n if n > 0 else 0.0
 
+    _regras = [
+        ("SPF",        "spf",        dict(valores=["SPF PLUS", "SPF BASICO", "SPF NORMAL"])),
+        ("AP",         "app",        dict(valores=["AP"])),
+        ("SEGURO VW",  "app",        dict(filtro="SEGURO VW")),
+        ("GAP",        "gap",        dict(valores=["GAP"])),
+        ("FRANQUIA",   "franquia",   dict(valores=["FRANQUIA"])),
+        ("GE",         "ge",         dict(valores=["GE 1", "GE 2", "GE 3", "GE 4"])),
+        ("PROTEGE",    "protege",    {}),
+        ("SEMPRE NOVO","sempre_novo",{}),
+    ]
     produtos = {}
-    for col in ["spf", "app", "gap", "franquia", "ge", "protege", "sempre_novo"]:
+    for label, col, kwargs in _regras:
         if col in sub.columns:
-            cnt = _count_col(sub, col)
+            cnt = _count_col(sub, col, **kwargs)
             if cnt > 0:
-                produtos[col.upper()] = cnt
+                produtos[label] = cnt
 
     vendedores = {}
     if "vendedor" in sub.columns:
