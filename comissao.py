@@ -356,6 +356,11 @@ def load_bigbase(client_id: str, sharing_url: str) -> tuple[pd.DataFrame | None,
 
         df = df.dropna(how="all")
 
+        # Apenas linhas com proposta preenchida são contratos válidos
+        if "proposta" in df.columns:
+            prop = df["proposta"].astype(str).str.strip().str.upper()
+            df = df[~prop.isin(["", "NAN", "NONE"])]
+
         # Tipos numéricos
         for col in ("retorno", "pontos", "valor_financiado"):
             if col in df.columns:

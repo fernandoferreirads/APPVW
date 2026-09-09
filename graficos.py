@@ -351,6 +351,7 @@ def _chart_produto(
     col: str,
     titulo: str,
     filtro: str | None = None,
+    valores: list[str] | None = None,
     y_min_floor: int = 50,
 ) -> tuple[go.Figure, pd.DataFrame]:
     """
@@ -379,7 +380,9 @@ def _chart_produto(
         period = pd.Period(year=y, month=m, freq="M")
         sub    = df_w[df_w["_periodo"] == period]
         vals   = sub[col].fillna("").astype(str).str.strip()
-        if filtro:
+        if valores:
+            ok = vals[vals.str.upper().isin([v.upper() for v in valores])]
+        elif filtro:
             ok = vals[vals.str.contains(filtro, case=False, na=False, regex=False)]
         else:
             ok = vals[~vals.isin(["", "nan", "None"])]
@@ -465,8 +468,9 @@ def _chart_produto(
 # ─── Gráfico 2 — Garantias (Qtd + % AAK) ────────────────────────────────────
 
 def _chart_garantias(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
-    """GE produzidas — delega ao helper genérico."""
-    return _chart_produto(df, col="ge", titulo="GARANTIAS")
+    """GE produzidas — apenas GE 1-4 (GE 5 e GM 2 excluídos)."""
+    return _chart_produto(df, col="ge", titulo="GARANTIAS",
+                          valores=["GE 1", "GE 2", "GE 3", "GE 4"])
 
 
 # ─── Gráfico 3 — Seguros (Qtd + % AAK) ──────────────────────────────────────
@@ -806,10 +810,11 @@ def _chart_spf(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
         sub    = df_w[df_w["_periodo"] == period]
         vals   = sub["spf"].fillna("").astype(str).str.strip()
 
-        nao_vazio = vals[~vals.isin(["", "nan", "None"])]
+        _SPF_VALIDOS = {"SPF PLUS", "SPF BASICO", "SPF NORMAL"}
+        nao_vazio = vals[vals.str.upper().isin(_SPF_VALIDOS)]
         total_spf.append(len(nao_vazio))
 
-        plus = vals[vals.str.contains("PLUS", case=False, na=False, regex=False)]
+        plus = vals[vals.str.upper() == "SPF PLUS"]
         spf_plus.append(len(plus))
 
         total_ct.append(len(sub))
