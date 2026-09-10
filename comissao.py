@@ -356,10 +356,13 @@ def load_bigbase(client_id: str, sharing_url: str) -> tuple[pd.DataFrame | None,
 
         df = df.dropna(how="all")
 
-        # Tipos numéricos
+        # Tipos numéricos — normaliza vírgula decimal (formato brasileiro)
         for col in ("retorno", "pontos", "valor_financiado"):
             if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce")
+                df[col] = pd.to_numeric(
+                    df[col].astype(str).str.replace(",", ".", regex=False),
+                    errors="coerce",
+                )
 
         # Data — aceita tanto serial Excel (número) quanto string DD/MM/YYYY
         if "data_pagto" in df.columns:
