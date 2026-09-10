@@ -124,8 +124,10 @@ def _chart_contratos_nv_sn(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
             "Colunas tipo_veiculo / data_pagto não encontradas — clique em 🔄 para recarregar"
         ), pd.DataFrame()
 
+    _prop_ok = df["proposta"].astype(str).str.strip().str.upper() if "proposta" in df.columns else pd.Series("X", index=df.index)
     df_tipo = df[
         df["tipo_veiculo"].fillna("").str.strip().str.upper().isin(["N", "S"])
+        & ~_prop_ok.isin(["", "NAN", "NONE"])
     ].copy()
     df_tipo["_periodo"] = df_tipo["data_pagto"].dt.to_period("M")
 
@@ -219,6 +221,11 @@ def _chart_contratos_aak(
 
     df_w = df.copy()
     df_w["_periodo"] = df_w["data_pagto"].dt.to_period("M")
+    if "proposta" in df_w.columns:
+        _p = df_w["proposta"].astype(str).str.strip().str.upper()
+        df_w["_tem_proposta"] = ~_p.isin(["", "NAN", "NONE"])
+    else:
+        df_w["_tem_proposta"] = True
 
     nv_vals:  list[int] = []
     tt_vals:  list[int] = []
@@ -227,7 +234,7 @@ def _chart_contratos_aak(
     for (y, m, _) in meses:
         period     = pd.Period(year=y, month=m, freq="M")
         period_str = f"{y:04d}-{m:02d}"
-        sub        = df_w[df_w["_periodo"] == period]
+        sub        = df_w[(df_w["_periodo"] == period) & df_w["_tem_proposta"]]
         tv         = sub["tipo_veiculo"].fillna("").str.strip().str.upper()
 
         nv_vals.append(int((tv == "N").sum()))
