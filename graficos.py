@@ -623,11 +623,6 @@ def _chart_pontos(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     df_w["_periodo"]    = df_w["data_pagto"].dt.to_period("M")
     df_w["_pontos_num"] = pd.to_numeric(df_w["pontos"], errors="coerce").fillna(0.0)
 
-    # pontos é métrica de contrato — filtra apenas linhas com proposta preenchida
-    if "proposta" in df_w.columns:
-        _p = df_w["proposta"].astype(str).str.strip().str.upper()
-        df_w = df_w[~_p.isin(["", "NAN", "NONE"])]
-
     totais: list[float] = []
 
     for (y, m, _) in meses:
@@ -713,21 +708,24 @@ def _chart_pontos_por_contrato(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFram
     df_w["_periodo"]    = df_w["data_pagto"].dt.to_period("M")
     df_w["_pontos_num"] = pd.to_numeric(df_w["pontos"], errors="coerce").fillna(0.0)
 
-    # pontos é métrica de contrato — filtra apenas linhas com proposta preenchida
+    # proposta filter só para o denominador (contratos de financiamento)
     if "proposta" in df_w.columns:
         _p = df_w["proposta"].astype(str).str.strip().str.upper()
-        df_w = df_w[~_p.isin(["", "NAN", "NONE"])]
+        df_w["_tem_proposta"] = ~_p.isin(["", "NAN", "NONE"])
+    else:
+        df_w["_tem_proposta"] = True
 
     medias: list[float] = []
 
     for (y, m, _) in meses:
-        period = pd.Period(year=y, month=m, freq="M")
-        sub    = df_w[df_w["_periodo"] == period]
-        total_pontos = float(sub["_pontos_num"].sum())
-        tv = sub["tipo_veiculo"].fillna("").str.strip().str.upper()
-        nv = int((tv == "N").sum())
-        sn = int((tv == "S").sum())
-        tt = nv + sn
+        period       = pd.Period(year=y, month=m, freq="M")
+        sub          = df_w[df_w["_periodo"] == period]
+        total_pontos = float(sub["_pontos_num"].sum())          # TODAS as linhas
+        sub_ct       = sub[sub["_tem_proposta"]]                # só contratos para denominador
+        tv           = sub_ct["tipo_veiculo"].fillna("").str.strip().str.upper()
+        nv           = int((tv == "N").sum())
+        sn           = int((tv == "S").sum())
+        tt           = nv + sn
         medias.append(round(total_pontos / tt, 2) if tt > 0 else 0.0)
 
     labels = [nome for (_, _, nome) in meses]
