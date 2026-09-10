@@ -90,9 +90,6 @@ def load_bigbase(excel_bytes: bytes) -> pd.DataFrame:
             df["pontos"].astype(str).str.replace(",", ".", regex=False), errors="coerce"
         ).fillna(0.0)
     df = df.dropna(subset=["data_pagto"])
-    # Só conta como contrato quando a proposta está preenchida
-    prop = df["proposta"].astype(str).str.strip().str.upper()
-    df = df[prop.notna() & (prop != "") & (prop != "NAN") & (prop != "NONE")]
     return df
 
 
@@ -125,6 +122,14 @@ def _count_col(sub: pd.DataFrame, col: str, filtro: str = "", valores: list = No
     return int((s.notna() & (s != "") & (s != "NAN") & (s != "NONE")).sum())
 
 
+def _n_contratos(sub: pd.DataFrame) -> int:
+    """Conta linhas com proposta preenchida (contratos de financiamento)."""
+    if "proposta" not in sub.columns:
+        return len(sub)
+    p = sub["proposta"].astype(str).str.strip().str.upper()
+    return int((~p.isin(["", "NAN", "NONE"])).sum())
+
+
 # ─── Geração de gráficos ──────────────────────────────────────────────────────
 def _fig_bytes(fig) -> bytes:
     buf = io.BytesIO()
@@ -146,7 +151,7 @@ def _chart_barras_perc(df, col, titulo, cor_barra, filtro="", valores=None) -> b
     """Barras de quantidade (eixo esq.) + linha % AAK (eixo dir. com escala %)."""
     meses  = _ultimos_meses(df, 5)
     labels = [r["label"] for r in meses]
-    totais = [len(r["df"]) for r in meses]
+    totais = [_n_contratos(r["df"]) for r in meses]
     qtds   = [_count_col(r["df"], col, filtro, valores) for r in meses]
     percs  = [round(q / t * 100, 1) if t > 0 else 0 for q, t in zip(qtds, totais)]
 
@@ -308,7 +313,9 @@ def chart_pontos(df: pd.DataFrame) -> bytes:
     medias = []
     for r in meses:
         s = r["df"]
-        medias.append(round(s["pontos"].sum() / len(s), 2) if len(s) > 0 and "pontos" in s.columns else 0)
+        total_pts = float(s["pontos"].sum()) if "pontos" in s.columns else 0.0
+        n_ct = _n_contratos(s)
+        medias.append(round(total_pts / n_ct, 2) if n_ct > 0 else 0)
 
     fig, ax = plt.subplots(figsize=(10, 4))
     bars = ax.bar(range(len(labels)), medias, color=AZUL_NV, zorder=3)
@@ -373,9 +380,9 @@ def resumo_ontem(df: pd.DataFrame) -> dict:
     ontem = date.today() - timedelta(days=1)
     sub   = df[df["data_pagto"].dt.date == ontem].copy()
 
-    total_pts = float(sub["pontos"].sum()) if "pontos" in sub.columns else 0.0
-    n = len(sub)
-    media_pts = total_pts / n if n > 0 else 0.0
+    total_pts   = float(sub["pontos"].sum()) if "pontos" in sub.columns else 0.0
+    n_contratos = _n_contratos(sub)
+    media_pts   = total_pts / n_contratos if n_contratos > 0 else 0.0
 
     _regras = [
         ("SPF",        "spf",        dict(valores=["SPF PLUS", "SPF BASICO", "SPF NORMAL"])),
@@ -401,7 +408,7 @@ def resumo_ontem(df: pd.DataFrame) -> dict:
 
     return {
         "data":         ontem.strftime("%d/%m/%Y"),
-        "contratos":    n,
+        "contratos":    n_contratos,
         "total_pontos": total_pts,
         "media_pontos": media_pts,
         "produtos":     produtos,
