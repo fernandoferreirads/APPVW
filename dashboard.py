@@ -410,8 +410,13 @@ def _pct_filled(df: pd.DataFrame, col: str) -> float:
 
 def calc_kpis(df: pd.DataFrame) -> dict:
     vf_medio = df["valor_financiado"].mean() if "valor_financiado" in df.columns else 0.0
+    if "proposta" in df.columns:
+        _p = df["proposta"].astype(str).str.strip().str.upper()
+        n_contratos = int((~_p.isin(["", "NAN", "NONE"])).sum())
+    else:
+        n_contratos = len(df)
     return {
-        "total_contratos": len(df),
+        "total_contratos": n_contratos,
         "total_retorno":   df["retorno"].sum()          if "retorno"          in df.columns else 0.0,
         "total_pontos":    df["pontos"].sum()            if "pontos"           in df.columns else 0.0,
         "total_vf":        df["valor_financiado"].sum()  if "valor_financiado" in df.columns else 0.0,

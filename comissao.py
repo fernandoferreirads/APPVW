@@ -650,7 +650,12 @@ def calc_commission(df: pd.DataFrame) -> dict:
         ).fillna(0.0)
         total_pontos = float(ps.sum())
 
-    total_contratos = len(df)
+    # contratos = apenas linhas com proposta preenchida (avulsos não são contratos)
+    if "proposta" in df.columns:
+        _p = df["proposta"].astype(str).str.strip().str.upper()
+        total_contratos = int((~_p.isin(["", "NAN", "NONE"])).sum())
+    else:
+        total_contratos = len(df)
     media_pontos = total_pontos / total_contratos if total_contratos > 0 else 0.0
 
     return {
