@@ -476,8 +476,8 @@ def _chart_garantias(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
 # ─── Gráfico 3 — Seguros (Qtd + % AAK) ──────────────────────────────────────
 
 def _chart_seguros(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
-    """Seguros VW — coluna N (app, pos. 13), filtra apenas 'SEGURO VW'."""
-    return _chart_produto(df, col="app", titulo="SEGUROS", filtro="SEGURO VW", y_min_floor=200)
+    """Seguros VW — coluna J (app), contabiliza apenas 'SEGURO VW'."""
+    return _chart_produto(df, col="app", titulo="SEGUROS", valores=["SEGURO VW"], y_min_floor=30)
 
 
 # ─── Gráfico 4 — Protege (Qtd + % AAK) ──────────────────────────────────────
