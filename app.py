@@ -1187,8 +1187,8 @@ with st.popover("⚙️  Configurações"):
                     st.success("✅ Período salvo!")
                     st.session_state.pop("_pf_autenticado", None)
 
-_tab_c, _tab_com, _tab_vend = st.tabs([
-    "📋  Contratos Banco VW", "💰  Comissão", "👤  Minha Produção",
+_tab_c, _tab_com, _tab_dash, _tab_vend = st.tabs([
+    "📋  Contratos Banco VW", "💰  Comissão", "📊  Dashboard", "👤  Minha Produção",
 ])
 
 with _tab_c:
@@ -1796,6 +1796,10 @@ with _tab_com:
                 st.session_state.pop("_comm_autenticado", None)
                 st.rerun()
         _render_comm(az_client_id, excel_url)
+
+with _tab_dash:
+    from graficos import render_graficos
+    render_graficos(az_client_id, excel_url)
 
 with _tab_vend:
     _render_vend(az_client_id, excel_url)
