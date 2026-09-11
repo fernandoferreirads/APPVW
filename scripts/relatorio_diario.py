@@ -212,6 +212,8 @@ def chart_contratos(df: pd.DataFrame) -> bytes:
         if h > 0:
             ax.text(bar.get_x() + bar.get_width()/2, h + 0.2, str(int(h)),
                     ha="center", va="bottom", fontsize=9, fontweight="bold")
+    y_max = max(max(nv + sn, default=0) * 1.50, 10)
+    ax.set_ylim(0, y_max)
     ax.set_xticks(list(x))
     ax.set_xticklabels(labels)
     ax.legend(fontsize=9)
@@ -267,6 +269,10 @@ def chart_contratos_aak(df: pd.DataFrame) -> bytes:
             ax2.text(i, p + 0.8, f"{p:.0f}%", ha="center", va="bottom",
                      fontsize=8, color=VERDE, fontweight="bold")
 
+    y_max1 = max(max(tt_vals + aak_vals, default=0) * 1.50, 10)
+    ax1.set_ylim(0, y_max1)
+    y_max2 = max(max(penet, default=0) * 1.50, 30)
+    ax2.set_ylim(0, y_max2)
     ax1.set_xticks(range(len(labels)))
     ax1.set_xticklabels(labels)
     ax1.set_ylabel("Quantidade", fontsize=9, color=VW_BLUE)
@@ -299,6 +305,8 @@ def chart_total_pontos(df: pd.DataFrame) -> bytes:
             ax.text(bar.get_x() + bar.get_width()/2, v + 0.5,
                     f"{v:.1f}".replace(".", ","), ha="center", va="bottom",
                     fontsize=9, fontweight="bold")
+    y_max = max(max(totais, default=0) * 1.50, 10)
+    ax.set_ylim(0, y_max)
     ax.set_xticks(range(len(labels)))
     ax.set_xticklabels(labels)
     _style_ax(ax, "TOTAL PONTOS")
@@ -324,6 +332,8 @@ def chart_pontos(df: pd.DataFrame) -> bytes:
         if v > 0:
             ax.text(bar.get_x() + bar.get_width()/2, v + 0.03,
                     f"{v:.2f}".replace(".", ","), ha="center", va="bottom", fontsize=9, fontweight="bold")
+    y_max = max(max(medias, default=0) * 1.50, 1.5 * 1.50)
+    ax.set_ylim(0, y_max)
     ax.set_xticks(range(len(labels)))
     ax.set_xticklabels(labels)
     ax.legend(fontsize=9)
@@ -358,6 +368,8 @@ def chart_spf(df: pd.DataFrame) -> bytes:
         if h > 0:
             ax.text(bar.get_x() + bar.get_width()/2, h + 0.2, str(int(h)),
                     ha="center", va="bottom", fontsize=9, fontweight="bold")
+    y_max = max(max(total + plus, default=0) * 1.50, 10)
+    ax.set_ylim(0, y_max)
     ax.set_xticks(list(x))
     ax.set_xticklabels(labels)
     ax.legend(fontsize=9)
