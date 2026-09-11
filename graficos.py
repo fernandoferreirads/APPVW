@@ -475,9 +475,9 @@ def _chart_produto(
 # ─── Gráfico 2 — Garantias (Qtd + % AAK) ────────────────────────────────────
 
 def _chart_garantias(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
-    """GE produzidas — apenas GE 1-4 (GE 5 e GM 2 excluídos)."""
+    """GE produzidas — GE 1 a GE 5."""
     return _chart_produto(df, col="ge", titulo="GARANTIAS",
-                          valores=["GE 1", "GE 2", "GE 3", "GE 4"])
+                          valores=["GE 1", "GE 2", "GE 3", "GE 4", "GE 5"])
 
 
 # ─── Gráfico 3 — Seguros (Qtd + % AAK) ──────────────────────────────────────
