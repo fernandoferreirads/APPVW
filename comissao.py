@@ -364,20 +364,11 @@ def load_bigbase(client_id: str, sharing_url: str) -> tuple[pd.DataFrame | None,
                     errors="coerce",
                 )
 
-        # Data — aceita tanto serial Excel (número) quanto string DD/MM/YYYY
+        # Data — parsing vetorizado idêntico ao script de geração da tabela de produção
         if "data_pagto" in df.columns:
-            def _parse_date(v):
-                if v is None or (isinstance(v, float) and pd.isna(v)):
-                    return pd.NaT
-                # Excel serial number
-                if isinstance(v, (int, float)):
-                    try:
-                        return pd.Timestamp("1899-12-30") + pd.Timedelta(days=int(v))
-                    except Exception:
-                        return pd.NaT
-                return pd.to_datetime(str(v), dayfirst=True, errors="coerce")
-
-            df["data_pagto"] = df["data_pagto"].apply(_parse_date)
+            df["data_pagto"] = pd.to_datetime(
+                df["data_pagto"], errors="coerce", dayfirst=True
+            )
 
         # Remove linhas completamente sem dados de vendedor e data
         df = df[~(df.get("vendedor", pd.Series(dtype=str)).isna()
