@@ -161,7 +161,7 @@ def _chart_contratos_nv_sn(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
     }))
 
     total_vals = [nv + sn for nv, sn in zip(nv_vals, sn_vals)]
-    y_max      = max(max(total_vals, default=0) * 1.18, 300)
+    y_max      = max(max(total_vals, default=0) * 1.50, 300)
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
@@ -284,7 +284,7 @@ def _chart_contratos_aak(
     y_max = max(
         max(tt_vals,  default=0),
         max(aak_vals, default=0),
-    ) * 1.30
+    ) * 1.50
     y_max = max(y_max, 300)
 
     penet_max = max(max(penet, default=0) * 1.30, 130)
@@ -424,7 +424,7 @@ def _chart_produto(
            for i in range(len(label_tabela))},
     }))
 
-    y_max_qtd = max(max(qtd, default=0) * 1.20, y_min_floor)
+    y_max_qtd = max(max(qtd, default=0) * 1.50, y_min_floor)
     y_max_pct = max(max(pct_aak, default=0) * 1.20, 140)
 
     fig = go.Figure()
@@ -550,7 +550,7 @@ def _chart_sempre_novo(
 
     bar_colors = [_AZUL_NV] * (len(labels) - 1) + [_LARANJA_SN]
 
-    y_max_qtd = max(max(qtds, default=0) * 1.25, 10)
+    y_max_qtd = max(max(qtds, default=0) * 1.50, 10)
     y_max_pct = max(max(pcts, default=0) * 1.25, 30.0)
 
     df_tabela = _str_df(pd.DataFrame({
@@ -655,7 +655,7 @@ def _chart_pontos(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
         **{label_tabela[i]: [_fmt(totais[i])] for i in range(len(label_tabela))},
     }))
 
-    y_max = max(max(totais, default=0) * 1.18, 500)
+    y_max = max(max(totais, default=0) * 1.50, 500)
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
@@ -738,7 +738,7 @@ def _chart_pontos_por_contrato(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFram
     medias.append(tend)
 
     bar_colors = [_AZUL_NV] * (len(labels) - 1) + [_LARANJA_SN]
-    y_max = max(max(medias, default=0) * 1.18, _META_PPC * 1.5)
+    y_max = max(max(medias, default=0) * 1.50, _META_PPC * 1.5)
 
     fig = go.Figure()
 
@@ -870,7 +870,7 @@ def _chart_spf(df: pd.DataFrame) -> tuple[go.Figure, pd.DataFrame]:
         ] for i in range(len(label_tabela))},
     }))
 
-    y_max = max(max(total_spf, default=0) * 1.35, 100)
+    y_max = max(max(total_spf, default=0) * 1.50, 100)
 
     fig = go.Figure()
 

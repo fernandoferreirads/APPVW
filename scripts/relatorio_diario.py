@@ -155,8 +155,8 @@ def _chart_barras_perc(df, col, titulo, cor_barra, filtro="", valores=None) -> b
     qtds   = [_count_col(r["df"], col, filtro, valores) for r in meses]
     percs  = [round(q / t * 100, 1) if t > 0 else 0 for q, t in zip(qtds, totais)]
 
-    # eixo esquerdo: teto = max bars * 1.35 (dá espaço aos rótulos)
-    y_left_max = max(max(qtds, default=0) * 1.35, 50)
+    # eixo esquerdo: teto = max bars * 1.60 (dá espaço aos rótulos)
+    y_left_max = max(max(qtds, default=0) * 1.60, 50)
     # eixo direito: 0–120% (igual ao app — linha nunca ultrapassa as barras)
     y_right_max = 120
 
