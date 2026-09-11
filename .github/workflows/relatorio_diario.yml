@@ -2,7 +2,7 @@ name: Relatório Diário de Produção
 
 on:
   schedule:
-    - cron: '0 12 * * 1-5'   # 09:00 BRT (12:00 UTC), segunda a sexta
+    - cron: '0 9 * * 1-5'    # ~09:45 BRT c/ delay GitHub (~06:00 BRT disparo, 09:00 UTC)
   workflow_dispatch:           # permite disparo manual pelo GitHub
 
 jobs:
