@@ -335,7 +335,7 @@ def chart_pontos(df: pd.DataFrame) -> bytes:
 
 def chart_garantias(df: pd.DataFrame) -> bytes:
     return _chart_barras_perc(df, "ge", "GARANTIAS", AZUL_NV,
-                              valores=["GE 1", "GE 2", "GE 3", "GE 4"])
+                              valores=["GE 1", "GE 2", "GE 3", "GE 4", "GE 5"])
 
 
 def chart_seguros(df: pd.DataFrame) -> bytes:
@@ -377,8 +377,11 @@ def chart_sempre_novo(df: pd.DataFrame) -> bytes:
 
 # ─── Resumo do dia anterior ───────────────────────────────────────────────────
 def resumo_ontem(df: pd.DataFrame) -> dict:
-    ontem = date.today() - timedelta(days=1)
-    sub   = df[df["data_pagto"].dt.date == ontem].copy()
+    # Usa a data mais recente com dados no BIGBASE (os lançamentos chegam em lote,
+    # não necessariamente no dia D-1 exato)
+    datas_validas = df["data_pagto"].dt.date.dropna()
+    data_ref = datas_validas.max() if not datas_validas.empty else date.today() - timedelta(days=1)
+    sub = df[df["data_pagto"].dt.date == data_ref].copy()
 
     total_pts   = float(sub["pontos"].sum()) if "pontos" in sub.columns else 0.0
     n_contratos = _n_contratos(sub)
@@ -390,7 +393,7 @@ def resumo_ontem(df: pd.DataFrame) -> dict:
         ("SEGURO VW",  "app",        dict(filtro="SEGURO VW")),
         ("GAP",        "gap",        dict(valores=["GAP"])),
         ("FRANQUIA",   "franquia",   dict(valores=["FRANQUIA"])),
-        ("GE",         "ge",         dict(valores=["GE 1", "GE 2", "GE 3", "GE 4"])),
+        ("GE",         "ge",         dict(valores=["GE 1", "GE 2", "GE 3", "GE 4", "GE 5"])),
         ("PROTEGE",    "protege",    {}),
         ("SEMPRE NOVO","sempre_novo",{}),
     ]
@@ -407,7 +410,7 @@ def resumo_ontem(df: pd.DataFrame) -> dict:
                       .value_counts().head(10).to_dict())
 
     return {
-        "data":         ontem.strftime("%d/%m/%Y"),
+        "data":         data_ref.strftime("%d/%m/%Y"),
         "contratos":    n_contratos,
         "total_pontos": total_pts,
         "media_pontos": media_pts,
