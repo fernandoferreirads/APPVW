@@ -198,6 +198,9 @@ def _chart_barras_perc(df, col, titulo, cor_barra, filtro="", valores=None) -> b
 
 
 def chart_contratos(df: pd.DataFrame) -> bytes:
+    if "proposta" in df.columns:
+        _p = df["proposta"].astype(str).str.strip().str.upper()
+        df = df[~_p.isin(["", "NAN", "NONE"])]
     meses = _ultimos_meses(df, 5)
     labels = [r["label"] for r in meses]
     nv = [_count_col(r["df"], "tipo_veiculo", "N") for r in meses]
@@ -236,6 +239,9 @@ def chart_contratos_aak(df: pd.DataFrame) -> bytes:
                 pivot = date(pivot.year, pivot.month, 1) - timedelta(days=1)
             y, m = pivot.year, pivot.month
         sub = df[(df["data_pagto"].dt.year == y) & (df["data_pagto"].dt.month == m)]
+        if "proposta" in sub.columns:
+            _p = sub["proposta"].astype(str).str.strip().str.upper()
+            sub = sub[~_p.isin(["", "NAN", "NONE"])]
         labels.append(f"{MESES_PT[m]}/{str(y)[2:]}")
         periodos.append(f"{y:04d}-{m:02d}")
         nv_vals.append(_count_col(sub, "tipo_veiculo", "N"))
